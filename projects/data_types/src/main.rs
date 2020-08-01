@@ -59,4 +59,38 @@ fn main() {
 
         println!("floating points: {}, {}, {}, {}", a, b, c, d);
     }
+
+    {
+        // The tuple type
+        let t: (i32, f64, u8) = (500, 6.4, 1);
+        let (x, y, z) = t;
+        println!("tuple: {:?}", t);
+        println!("Destructured tuple elements: {}, {}, {}", x, y, z);
+        println!("Tuple access with dot nottation: {}, {}, {}", t.0, t.1, t.2);
+        // Tuple is immutable by default as well
+        // t.0 = 1;
+
+        let mut t: (i32, char) = (1, 'あ');
+        t.1 = 'い';
+        println!("Mutable tuple: {:?}", t);
+    }
+
+    {
+        // The array type
+        let a = [1, 2, 3, 4, 5];
+        println!("Array: {:?}", a);
+        // Array is immutable by default as well
+        // a[1]=2;
+
+        let mut a: [char; 4] = ['a', 'b', 'c', 'd'];
+        // Index out of bounds access for an array is compile error in Rust
+        // a[4] = 'e';
+        // println!("Index out of bounds: {}", a[11]);
+        a[3] = 'e';
+        println!("Array: {:?}", a);
+
+        let mut a = [1; 10];
+        a[1] = 2;
+        println!("Initialization with same values: {:?}", a);
+    }
 }
