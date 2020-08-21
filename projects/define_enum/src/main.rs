@@ -54,4 +54,31 @@ fn main() {
         let loopback = IpAddr::V6(String::from("::1"));
         println!("home: {:?}, loopback: {:?}", home, loopback);
     }
+
+    #[derive(Debug)]
+    enum Message {
+        Quit,
+        Move { x: i32, y: i32 },
+        Write(String),
+        ChangeColor(i32, i32, i32),
+    }
+
+    {
+        let q = Message::Quit;
+        let m = Message::Move {x: 1, y: 2};
+        let w = Message::Write(String::from("abc"));
+        let c = Message::ChangeColor(1, 2, 3);
+
+        println!("{:?}, {:?}, {:?}, {:?}", q, m, w, c);
+    }
+
+    // The Option Enum and Its Advantages Over Null Values
+
+    {
+        let n = Some(5);
+        let s = Some("a string");
+        let none: Option<i32> = None;
+
+        println!("{:?}, {:?}, {:?}", n, s, none);
+    }
 }
