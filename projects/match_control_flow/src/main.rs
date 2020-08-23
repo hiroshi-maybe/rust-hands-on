@@ -45,4 +45,11 @@ fn main() {
         println!("{:?} + 1 = {:?}", five, six);
         println!("{:?} + 1 = {:?}", None as Option<i32>, none);
     }
+
+    {
+        let v = Some(3);
+        if let Some(3) = v {
+            println!("three");
+        }
+    }
 }
