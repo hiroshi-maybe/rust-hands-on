@@ -39,4 +39,24 @@ fn main() {
 
         println!("{}, {}", s, s1);
     }
+
+    {
+        // 4 bytes, 4 unicode characters
+        let hello1 = String::from("Hola");
+        // 24 bytes, 12 unicode chars
+        let hello2 = String::from("Здравствуйте");
+        // This works because it's character boundary
+        println!("{}", &hello2[0..4]);
+        // Panic due to invalid char boundary error
+        //println!("{}", &hello2[0..1]);
+
+        // 25 bytes, 7 unicode chars
+        let emoji = String::from("👨‍👩‍👧‍👧");
+        // 3 bytes, 1 unicode char
+        let ga = String::from("あ");
+        let strs = [hello1, hello2, emoji, ga];
+        for s in &strs {
+            println!("{} is {} bytes, {} unicode chars", s, s.len(), s.chars().count());
+        }
+    }
 }
