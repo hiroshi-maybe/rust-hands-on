@@ -45,4 +45,52 @@ fn main() {
             println!("{} -> {}", key, value);
         }
     }
+
+    {
+        let mut scores = HashMap::new();
+        scores.insert("Blue", 10);
+        scores.insert("Blue", 11);
+        println!("{:?}", scores);
+
+        let b = scores.entry("Blue").or_insert(100);
+        println!("{}", b);
+        let y = scores.entry("Yellow").or_insert(100);
+        println!("{}", y);
+
+        println!("{:?}", scores);
+    }
+
+    {
+        let text = "hello world wonderful world";
+        let mut map = HashMap::new();
+        let mut a=0;
+        for word in text.split_whitespace() {
+            let cnt = map.entry(word).or_insert(0);
+            *cnt += 1;
+
+            // Possible to pass dereferenced copyable value
+            a = *cnt;
+        }
+        println!("{}", a);
+        println!("{:?}", map);
+    }
+
+    {
+        #[derive(Debug)]
+        struct Counter {
+            val: i32,
+        };
+
+        let text = "hello world wonderful world";
+        let mut map = HashMap::new();
+        let mut a=Counter { val: 0 };
+        for word in text.split_whitespace() {
+            let cnt = map.entry(word).or_insert(Counter { val: 0 });
+            cnt.val += 1;
+            // Error because mutable reference cannot be borrowed without move
+            //a = *cnt;
+        }
+        println!("{:?}", a);
+        println!("{:?}", map);
+    }
 }
