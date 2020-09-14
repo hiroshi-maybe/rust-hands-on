@@ -34,6 +34,7 @@ impl Summary for Tweet {
         format!("@{}", self.username)
     }
 }
+impl Display for Tweet {}
 
 pub struct MyDiary {}
 impl Summary for MyDiary {
@@ -41,3 +42,5 @@ impl Summary for MyDiary {
         String::from("me")
     }
 }
+
+pub trait Display {}
