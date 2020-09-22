@@ -1,9 +1,13 @@
-fn prints_and_returns10(a: i32) -> i32 {
+pub fn prints_and_returns10(a: i32) -> i32 {
     println!("I got the value {}", a);
     10
 }
 
-fn add_two(a: i32) -> i32 {
+pub fn add_two(a: i32) -> i32 {
+    private_add_two(a)
+}
+
+fn private_add_two(a: i32) -> i32 {
     a + 2
 }
 
@@ -20,6 +24,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn will_fail() {
         assert_eq!(5, prints_and_returns10(2));
     }
@@ -31,17 +36,17 @@ mod tests {
 
     #[test]
     fn add_test1() {
-        assert_eq!(4, add_two(2));
+        assert_eq!(4, private_add_two(2));
     }
 
     #[test]
     fn add_test2() {
-        assert_eq!(5, add_two(3));
+        assert_eq!(5, private_add_two(3));
     }
 
     #[test]
     fn add_test3() {
-        assert_eq!(102, add_two(100));
+        assert_eq!(102, private_add_two(100));
     }
 
     // $ cargo test -- --ignored
