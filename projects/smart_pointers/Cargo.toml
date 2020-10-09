@@ -1,5 +1,5 @@
 [package]
-name = "boxes"
+name = "smart_pointers"
 version = "0.1.0"
 authors = ["Hiroshi Kori <hiroshi.maybe@gmail.com>"]
 edition = "2018"
