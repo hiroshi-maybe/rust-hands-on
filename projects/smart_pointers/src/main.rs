@@ -77,4 +77,17 @@ fn main() {
         assert_eq!(5, x);
         assert_eq!(5, *y);
     }
+
+    {
+        // Implicit Deref Coercions with Functions and Methods
+
+        fn hello(name: &str) {
+            println!("Hello, {}!", name);
+        }
+
+        let m = MyBox::new(String::from("Rust"));
+        hello(&m);
+        hello(m.deref());
+        hello(&(*m)[..]);
+    }
 }
