@@ -1,11 +1,15 @@
 use std::ops::Deref;
 
+// Ch 15-1 box
+
 #[derive(Debug)]
 enum List {
     Cons(i32, Box<List>),
     Nil,
 }
 use crate::List::{Cons, Nil};
+
+// Ch 15-2 deref
 
 struct MyBox<T>(T);
 impl<T> MyBox<T> {
@@ -17,6 +21,19 @@ impl<T> Deref for MyBox<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.0
+    }
+}
+
+// Ch 15-3 drop
+
+#[derive(Debug)]
+struct CustomSmartPointer {
+    data: String,
+}
+
+impl Drop for CustomSmartPointer {
+    fn drop(&mut self) {
+        println!("Dropping CustomSmartPointer with data `{}`!", self.data);
     }
 }
 
@@ -89,5 +106,11 @@ fn main() {
         hello(&m);
         hello(m.deref());
         hello(&(*m)[..]);
+    }
+
+    {
+        let c = CustomSmartPointer { data: String::from("my stuff") };
+        let d = CustomSmartPointer { data: String::from("other stuff") };
+        println!("CustomSmartPointers created: {:?}, {:?}", c, d);
     }
 }
