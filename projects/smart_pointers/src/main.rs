@@ -112,5 +112,11 @@ fn main() {
         let c = CustomSmartPointer { data: String::from("my stuff") };
         let d = CustomSmartPointer { data: String::from("other stuff") };
         println!("CustomSmartPointers created: {:?}, {:?}", c, d);
+        // Error: `explicit destructor calls not allowed`
+        // c.drop();
+        drop(c);
+        // Error: `value used here after move`
+        // drop(c);
+        println!("CustomSmartPointers dropped before the end of main.");
     }
 }
