@@ -37,6 +37,16 @@ impl Drop for CustomSmartPointer {
     }
 }
 
+// Ch 15-4 reference counting
+
+use std::rc::Rc;
+
+#[derive(Debug)]
+enum RcList {
+    Cons(i32, Rc<RcList>),
+    Nil,
+}
+
 fn main() {
     {
         // Using a Box<T> to Store Data on the Heap
@@ -118,5 +128,20 @@ fn main() {
         // Error: `value used here after move`
         // drop(c);
         println!("CustomSmartPointers dropped before the end of main.");
+    }
+
+    {
+        // Using Rc<T> to Share Data
+
+        let a = Cons(5, Box::new(Cons(10, Box::new(Nil))));
+        let b = Cons(3, Box::new(a));
+        // Error: `value used here after move`
+        // let c = Cons(4, Box::new(a));
+
+        let a = Rc::new(RcList::Cons(5, Rc::new(RcList::Cons(10, Rc::new(RcList::Nil)))));
+        let b = RcList::Cons(3, Rc::clone(&a));
+        let c = RcList::Cons(4, Rc::clone(&a));
+
+        println!("{:?}, {:?}, {:?}", a, b, c);
     }
 }
