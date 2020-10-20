@@ -139,9 +139,13 @@ fn main() {
         // let c = Cons(4, Box::new(a));
 
         let a = Rc::new(RcList::Cons(5, Rc::new(RcList::Cons(10, Rc::new(RcList::Nil)))));
+        println!("count after creating a = {}", Rc::strong_count(&a));
         let b = RcList::Cons(3, Rc::clone(&a));
-        let c = RcList::Cons(4, Rc::clone(&a));
-
-        println!("{:?}, {:?}, {:?}", a, b, c);
+        println!("count after creating a = {}", Rc::strong_count(&a));
+        {
+            let c = RcList::Cons(4, Rc::clone(&a));
+            println!("count after creating c = {}", Rc::strong_count(&a));
+        }
+        println!("count after c is dropped = {}", Rc::strong_count(&a));
     }
 }
