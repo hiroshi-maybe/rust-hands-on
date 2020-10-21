@@ -1,5 +1,10 @@
 use std::ops::Deref;
 
+/// From https://doc.rust-lang.org/book/ch15-05-interior-mutability.html#interior-mutability-a-mutable-borrow-to-an-immutable-value
+/// - `Rc<T>` enables multiple owners of the same data; `Box<T>` and `RefCell<T>` have single owners.
+/// - `Box<T>` allows immutable or mutable borrows checked at compile time; `Rc<T>` allows only immutable borrows checked at compile time; `RefCell<T>` allows immutable or mutable borrows checked at runtime.
+/// - Because `RefCell<T>` allows mutable borrows checked at runtime, you can mutate the value inside the `RefCell<T>` even when the `RefCell<T>` is immutable.
+
 // Ch 15-1 box
 
 #[derive(Debug)]
@@ -147,5 +152,14 @@ fn main() {
             println!("count after creating c = {}", Rc::strong_count(&a));
         }
         println!("count after c is dropped = {}", Rc::strong_count(&a));
+    }
+
+    {
+        // Interior Mutability: A Mutable Borrow to an Immutable Value
+
+        let s = String::from("str");
+        // Error: `cannot borrow as mutable`
+        // let t = &mut s;
+        // t.push_str("str");
     }
 }
