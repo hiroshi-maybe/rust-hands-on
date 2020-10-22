@@ -52,6 +52,15 @@ enum RcList {
     Nil,
 }
 
+// Ch 15-5 mutable list for multiple owners
+
+use std::cell::RefCell;
+#[derive(Debug)]
+enum RefCellList {
+    Cons(Rc<RefCell<i32>>, Rc<RefCellList>),
+    Nil,
+}
+
 fn main() {
     {
         // Using a Box<T> to Store Data on the Heap
@@ -161,5 +170,21 @@ fn main() {
         // Error: `cannot borrow as mutable`
         // let t = &mut s;
         // t.push_str("str");
+    }
+
+    {
+        // Having Multiple Owners of Mutable Data by Combining Rc<T> and RefCell<T>
+
+        let value = Rc::new(RefCell::new(5));
+
+        let a = Rc::new(RefCellList::Cons(Rc::clone(&value), Rc::new(RefCellList::Nil)));
+
+        let b = RefCellList::Cons(Rc::new(RefCell::new(3)), Rc::clone(&a));
+        let c = RefCellList::Cons(Rc::new(RefCell::new(4)), Rc::clone(&a));
+
+        *value.borrow_mut() += 10;
+        println!("a after = {:?}", a);
+        println!("b after = {:?}", b);
+        println!("c after = {:?}", c);
     }
 }
