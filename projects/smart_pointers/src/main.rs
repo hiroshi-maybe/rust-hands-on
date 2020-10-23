@@ -55,10 +55,29 @@ enum RcList {
 // Ch 15-5 mutable list for multiple owners
 
 use std::cell::RefCell;
+
 #[derive(Debug)]
 enum RefCellList {
     Cons(Rc<RefCell<i32>>, Rc<RefCellList>),
     Nil,
+}
+
+// Ch 15-6 create reference cycle
+
+#[derive(Debug)]
+enum SharedCellList {
+    Cons(i32, RefCell<Rc<SharedCellList>>),
+    Nil,
+}
+
+
+impl SharedCellList {
+    fn tail(&self) -> Option<&RefCell<Rc<SharedCellList>>> {
+        match self {
+            SharedCellList::Cons(_, item) => Some(item),
+            SharedCellList::Nil => None,
+        }
+    }
 }
 
 fn main() {
@@ -186,5 +205,37 @@ fn main() {
         println!("a after = {:?}", a);
         println!("b after = {:?}", b);
         println!("c after = {:?}", c);
+    }
+
+    {
+        // Create a reference cycle
+
+        let a = Rc::new(SharedCellList::Cons(5, RefCell::new(Rc::new(SharedCellList::Nil))));
+
+        println!("a initial rc count = {}", Rc::strong_count(&a));
+        println!("a next item = {:?}", a.tail());
+
+        let b = Rc::new(SharedCellList::Cons(10, RefCell::new(Rc::clone(&a))));
+
+        println!("a rc count after b creation = {}", Rc::strong_count(&a));
+        println!("b initial rc count = {}", Rc::strong_count(&b));
+        println!("b next item = {:?}", b.tail());
+
+        if let Some(link) = a.tail() {
+            *link.borrow_mut() = Rc::clone(&b);
+        }
+
+        println!("b rc count after changing a = {}", Rc::strong_count(&b));
+        println!("a rc count after changing a = {}", Rc::strong_count(&a));
+
+        // Runtime error: `fatal runtime error: stack overflow`
+        // println!("a next item = {:?}", a.tail());
+
+        if let Some(link) = a.tail() {
+            *link.borrow_mut() = Rc::new(SharedCellList::Nil);
+
+            // Can be printed after cutting the reference cycle
+            println!("a next item = {:?}", a.tail());
+        }
     }
 }
