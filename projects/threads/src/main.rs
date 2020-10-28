@@ -2,7 +2,11 @@ use std::thread;
 use std::time::Duration;
 use std::sync::mpsc::{self, Sender};
 
+use std::sync::{Mutex, Arc};
+
 fn main() {
+    println!("** 16-1 Using Threads to Run Code Simultaneously");
+
     {
         // Creating a New Thread with spawn
 
@@ -36,6 +40,8 @@ fn main() {
 
         handle.join().unwrap();
     }
+
+    println!("** 16-2 Using Message Passing to Transfer Data Between Threads");
 
     {
         // Using Message Passing to Transfer Data Between Threads
@@ -91,5 +97,42 @@ fn main() {
         for received in rx {
             println!("Got: {}", received);
         }
+    }
+
+    println!("** 16-3 Using Mutexes to Allow Access to Data from One Thread at a Time");
+
+    {
+        // Using Mutexes to Allow Access to Data from One Thread at a Time
+
+        let m = Mutex::new(5);
+
+        {
+            let mut num = m.lock().unwrap();
+            *num = 6;
+        }
+
+        println!("m = {:?}", m);
+    }
+
+    {
+        // Sharing a Mutex<T> Between Multiple Threads
+
+        let counter = Arc::new(Mutex::new(0));
+        let mut handles = vec![];
+
+        for _ in 0..10 {
+            let counter = Arc::clone(&counter);
+            let handle = thread::spawn(move || {
+                let mut num = counter.lock().unwrap();
+                *num += 1;
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        println!("Result: {}", *counter.lock().unwrap());
     }
 }
