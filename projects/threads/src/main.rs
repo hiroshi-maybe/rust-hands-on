@@ -115,7 +115,7 @@ fn main() {
     }
 
     {
-        // Sharing a Mutex<T> Between Multiple Threads
+        // Atomic Reference Counting with Arc<T>
 
         let counter = Arc::new(Mutex::new(0));
         let mut handles = vec![];
@@ -134,5 +134,46 @@ fn main() {
         }
 
         println!("Result: {}", *counter.lock().unwrap());
+    }
+
+    //#[cfg(feature = "deadlock_detection")]
+    {
+        /*
+        use parking_lot::deadlock;
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_secs(1));
+                let deadlocks = deadlock::check_deadlock();
+                if deadlocks.is_empty() {
+                    println!("No deadlock found");
+                    continue;
+                }
+
+                println!("{} deadlocks detected", deadlocks.len());
+                for (i, threads) in deadlocks.iter().enumerate() {
+                    println!("Deadlock #{}", i);
+                    for t in threads {
+                        println!("Thread Id {:#?}", t.thread_id());
+                        println!("{:#?}", t.backtrace());
+                    }
+                }
+            }
+        });*/
+
+        // Code which causes a deadlock!!
+
+        let counter1 = Mutex::new(0);
+
+        println!("c1 will be locked");
+        let mut locked_c1 = counter1.lock().unwrap();
+        *locked_c1 += 1;
+        println!("c1 is {}", locked_c1);
+
+        // Without dropping the lock before locking the same mutex in the same thread again, it causes a deadlock.
+        // drop(locked_c1);
+        // println!("c1 is dropped before taking a lock again");
+
+        println!("c1 will be locked again in the same thread");
+        println!("c1: {}", counter1.lock().unwrap());
     }
 }
