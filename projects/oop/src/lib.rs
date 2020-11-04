@@ -1,3 +1,54 @@
+// Ch 17-2 Using Trait Objects That Allow for Values of Different Types
+
+/**
+ *  A trait is object safe if all the methods defined in the trait have the following properties:
+ *  - The return type isn’t Self.
+ *  - There are no generic type parameters.
+ */
+
+pub trait Draw {
+    fn draw(&self);
+}
+
+pub struct Screen {
+    pub components: Vec<Box<dyn Draw>>,
+}
+
+impl Screen {
+    pub fn run(&self) {
+        for component in self.components.iter() {
+            component.draw();
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Button {
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl Draw for Button {
+    fn draw(&self) {
+        println!("Button {:?} was drawn", self);
+    }
+}
+
+#[derive(Debug)]
+pub struct SelectBox {
+    pub width: u32,
+    pub height: u32,
+    pub options: Vec<String>,
+}
+
+impl Draw for SelectBox {
+    fn draw(&self) {
+        println!("SelectBox {:?} was drawn", self);
+    }
+}
+
+// Ch 17-1 Characteristics of Object-Oriented Languages
 
 pub struct AveragedCollection {
     list: Vec<i32>,
