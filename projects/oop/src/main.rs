@@ -28,6 +28,8 @@ fn main() {
 
     {
         // Ch 17-3 Implementing an Object-Oriented Design Pattern
+
+        // State pattern
         use oop::Post;
 
         let mut post = Post::new();
@@ -41,5 +43,13 @@ fn main() {
         post.approve();
         assert_eq!("I ate a salad for lunch today", post.content());
 
+        // Type safe encoding
+        use oop::SafePost;
+
+        let mut post = SafePost::new();
+        post.add_text("I ate a salad for lunch today");
+        let post = post.request_review();
+        let post = post.approve();
+        assert_eq!("I ate a salad for lunch today", post.content());
     }
 }

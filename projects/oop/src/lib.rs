@@ -1,5 +1,49 @@
 // Ch 17-3 Implementing an Object-Oriented Design Pattern
 
+pub struct SafePost {
+    content: String,
+}
+
+pub struct SafeDraftPost {
+    content: String,
+}
+
+impl SafePost {
+    pub fn new() -> SafeDraftPost {
+        SafeDraftPost {
+            content: String::new(),
+        }
+    }
+
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+}
+
+impl SafeDraftPost {
+    pub fn add_text(&mut self, text: &str) {
+        self.content.push_str(text);
+    }
+
+    pub fn request_review(self) -> SafePendingReviewPost {
+        SafePendingReviewPost {
+            content: self.content,
+        }
+    }
+}
+
+pub struct SafePendingReviewPost {
+    content: String,
+}
+
+impl SafePendingReviewPost {
+    pub fn approve(self) -> SafePost {
+        SafePost {
+            content: self.content,
+        }
+    }
+}
+
 pub struct Post {
     state: Option<Box<dyn State>>,
     content: String,
