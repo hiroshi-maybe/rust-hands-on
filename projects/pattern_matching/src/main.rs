@@ -58,4 +58,14 @@ fn main() {
 
         print_coordinates(&(3,5));
     }
+
+    // Ch 18-2 Refutability: Whether a Pattern Might Fail to Match
+
+    {
+        let xs = vec![Some(1), None, Some(2)];
+
+        for /*let .Some(x)*/ x in xs {
+            println!("{:?}", x);
+        }
+    }
 }
