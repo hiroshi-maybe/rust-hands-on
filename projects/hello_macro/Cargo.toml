@@ -10,3 +10,4 @@ src = "src/main.rs"
 
 [dependencies]
 hello_macro_derive = { path = "./hello_macro_derive" }
+hello_macro_attribute = { path = "./hello_macro_attribute" }
