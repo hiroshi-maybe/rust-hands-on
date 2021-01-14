@@ -14,7 +14,7 @@ fn main() {
     // Threads are spawned and one of them takes and keeps a lock.
     let pool = ThreadPool::new(4);
 
-    for stream in listener.incoming() {
+    for stream in listener.incoming().take(2) {
         let stream = stream.unwrap();
 
         println!("NEW STREAM");
@@ -25,6 +25,8 @@ fn main() {
             println!("[Worker {}] finish a job", id);
         });
     }
+
+    println!("Shutting down.");
 }
 
 fn handle_connection(mut stream: TcpStream, id: usize) {
@@ -36,7 +38,7 @@ fn handle_connection(mut stream: TcpStream, id: usize) {
     let get = b"GET / HTTP/1.1\r\n";
     let sleep = b"GET /sleep HTTP/1.1\r\n";
 
-    let rawReq = String::from_utf8_lossy((&buffer[..]));
+    let raw_req = String::from_utf8_lossy(&buffer[..]);
 
     if buffer.starts_with(get) {
         let response = response_from_file(200, "OK", "hello.html");
@@ -47,7 +49,7 @@ fn handle_connection(mut stream: TcpStream, id: usize) {
         write(stream, &response);
     } else {
         println!("Unexpected request");
-        println!("Request: {}", rawReq);
+        println!("Request: {}", raw_req);
         let response = response_from_file(404, "NOT FOUND", "404.html");
         write(stream, &response);
     }

@@ -3,9 +3,14 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
 
+enum Message {
+    NewJob(Job),
+    Terminate,
+}
+
 pub struct ThreadPool {
     workers: Vec<Worker>,
-    sender: mpsc::Sender<Job>,
+    sender: mpsc::Sender<Message>,
 }
 
 type Job = Box<dyn FnOnce(usize) + Send + 'static>;
@@ -36,38 +41,82 @@ impl ThreadPool {
         F: FnOnce(usize) + Send + 'static,
     {
         let job = Box::new(f);
-        self.sender.send(job).unwrap();
+        self.sender.send(Message::NewJob(job)).unwrap();
+    }
+}
+
+impl Drop for ThreadPool {
+    fn drop(&mut self) {
+        println!("Sending terminate message to all workers.");
+
+        for _ in &self.workers {
+            // This is non-blocking
+            self.sender.send(Message::Terminate).unwrap();
+        }
+
+        println!("Shutting down all workers.");
+
+        for worker in &mut self.workers {
+            println!("[Worker {}] start shutting down", worker.id);
+            if let Some(thread) = worker.thread.take() {
+                // This is blocking. Wait until terminate signal is received.
+                thread.join().unwrap();
+            }
+
+            println!("[Worker {}] finish shutting down", worker.id);
+        }
     }
 }
 
 struct Worker {
     id: usize,
-    thread: thread::JoinHandle<()>,
+    thread: Option<thread::JoinHandle<()>>,
 }
 
 impl Worker {
-    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
+    /// Four states
+    ///
+    /// 1. waiting for a lock. Go to state #2 once a lock is obtained.
+    /// 2. waiting for a message with a mutex lock
+    ///     ¡) message is a new job => go to state #3
+    ///     ii) message is terminate => go to state #4
+    /// 3. processing a request (lock is released), back to state #1 once completed.
+    /// 4. terminated (handled by join)
+    ///
+    /// State #2 is killed first with a terminate message
+    /// State #1 and #3 take a lock and are killed with succeeding terminate messages
+    ///
+    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
         let thread = thread::spawn(move || loop {
 
-            let job: Job;
+            let message: Message;
             {
                 println!("[Worker {}] waiting for a lock", id);
                 // lock() acquires the mutex
                 let receiver = receiver.lock().unwrap();
                 println!("[Worker {}] got a lock", id);
                 // recv() blocks until a job becomes available
-                job = receiver.recv().unwrap();
+                message = receiver.recv().unwrap();
+                println!("[Worker {}] releasing a lock", id);
             }
             // Receiver is dropped -> Mutex is freed -> Other thread takes a lock
 
             //let job = receiver.lock().unwrap().recv().unwrap();
 
-            println!("[Worker {}] got a job; executing.", id);
-            job(id);
-            println!("[Worker {}] finished.", id);
+            match message {
+                Message::NewJob(job) => {
+                    println!("[Worker {}] got a job; executing.", id);
+                    job(id);
+                    println!("[Worker {}] finished.", id);
+                },
+                Message::Terminate => {
+                    println!("[Worker {}] received a terminate signal.", id);
+                    break;
+                }
+            }
         });
         println!("[Worker {}] Thread spawned", id);
 
-        Worker { id, thread }
+        Worker { id, thread: Some(thread), }
     }
 }
