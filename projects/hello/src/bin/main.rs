@@ -11,24 +11,32 @@ use std::time::Duration;
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
 
+    // Threads are spawned and one of them takes and keeps a lock.
+    let pool = ThreadPool::new(4);
+
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        let pool = ThreadPool::new(4);
 
-        pool.execute(|| {
-            handle_connection(stream);
+        println!("NEW STREAM");
+
+        pool.execute(|id| {
+            println!("[Worker {}] start a job", id);
+            handle_connection(stream, id);
+            println!("[Worker {}] finish a job", id);
         });
     }
 }
 
-fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(mut stream: TcpStream, id: usize) {
     let mut buffer = [0; 1024];
+    println!("[Worker {}] start reading a stream", id);
     stream.read(&mut buffer).unwrap();
+    println!("[Worker {}] finish reading a stream", id);
 
     let get = b"GET / HTTP/1.1\r\n";
     let sleep = b"GET /sleep HTTP/1.1\r\n";
 
-    println!("Request: {}", String::from_utf8_lossy((&buffer[..])));
+    let rawReq = String::from_utf8_lossy((&buffer[..]));
 
     if buffer.starts_with(get) {
         let response = response_from_file(200, "OK", "hello.html");
@@ -39,6 +47,7 @@ fn handle_connection(mut stream: TcpStream) {
         write(stream, &response);
     } else {
         println!("Unexpected request");
+        println!("Request: {}", rawReq);
         let response = response_from_file(404, "NOT FOUND", "404.html");
         write(stream, &response);
     }
