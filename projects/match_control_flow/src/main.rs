@@ -24,8 +24,11 @@ fn main() {
 
     {
         let coins: [Coin; 4] = [
-            Coin::Penny, Coin::Nickel, Coin::Dime,
-            Coin::Quarter(UsState::Alaska)];
+            Coin::Penny,
+            Coin::Nickel,
+            Coin::Dime,
+            Coin::Quarter(UsState::Alaska),
+        ];
         for c in coins.iter() {
             println!("value for {:?} is {}", c, value(&c));
         }
@@ -34,8 +37,8 @@ fn main() {
     {
         fn plus_one(x: Option<i32>) -> Option<i32> {
             match x {
-            None => None,
-            Some(i) => Some(i+1),
+                None => None,
+                Some(i) => Some(i + 1),
             }
         }
 

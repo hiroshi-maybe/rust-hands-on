@@ -35,5 +35,5 @@ pub fn eat_at_restaurant() {
     let order1 = back_of_house::Appetizer::Soup;
 }
 
-use std::{cmp::Ordering, io};
 use std::collections::*;
+use std::{cmp::Ordering, io};

@@ -1,7 +1,7 @@
 use hello_macro::myvec;
 use hello_macro::HelloMacro;
-use hello_macro_derive::HelloMacro;
 use hello_macro_attribute::show_streams;
+use hello_macro_derive::HelloMacro;
 
 #[derive(HelloMacro)]
 struct Pancakes;
@@ -14,7 +14,7 @@ fn hello_attr_like_macro() {
 fn main() {
     {
         // Declarative Macros with macro_rules! for General Metaprogramming
-        let v = myvec![1,2,3];
+        let v = myvec![1, 2, 3];
         println!("{:?}", v);
     }
 

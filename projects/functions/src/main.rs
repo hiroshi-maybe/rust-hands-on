@@ -31,10 +31,12 @@ fn another_function(x: i32) {
     println!("The value passed to another function is : {}", x);
 }
 
-fn five() -> i32 { 5 }
+fn five() -> i32 {
+    5
+}
 
 fn parity(n: i32) -> i32 {
-    if n%2!=0 {
+    if n % 2 != 0 {
         return 1;
     }
 
@@ -42,5 +44,9 @@ fn parity(n: i32) -> i32 {
 }
 
 fn fact(n: u32) -> u32 {
-    if n==1 { 1 } else { n*fact(n-1) }
+    if n == 1 {
+        1
+    } else {
+        n * fact(n - 1)
+    }
 }

@@ -88,7 +88,6 @@ impl Worker {
     ///
     fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
         let thread = thread::spawn(move || loop {
-
             let message: Message;
             {
                 println!("[Worker {}] waiting for a lock", id);
@@ -108,7 +107,7 @@ impl Worker {
                     println!("[Worker {}] got a job; executing.", id);
                     job(id);
                     println!("[Worker {}] finished.", id);
-                },
+                }
                 Message::Terminate => {
                     println!("[Worker {}] received a terminate signal.", id);
                     break;
@@ -117,6 +116,9 @@ impl Worker {
         });
         println!("[Worker {}] Thread spawned", id);
 
-        Worker { id, thread: Some(thread), }
+        Worker {
+            id,
+            thread: Some(thread),
+        }
     }
 }

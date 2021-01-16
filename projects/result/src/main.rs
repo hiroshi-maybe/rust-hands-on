@@ -35,7 +35,8 @@ fn main() {
     }
 
     {
-        let f = File::open("hello.txt").expect("Failed to open hello.txt");println!("Opened file 3: {:?}", f);
+        let f = File::open("hello.txt").expect("Failed to open hello.txt");
+        println!("Opened file 3: {:?}", f);
     }
 
     {

@@ -1,14 +1,14 @@
 /*
 
-  Five actions in unsafe Rust, called unsafe superpowers, that you can’t in safe Rust. Those superpowers include the ability to:
+ Five actions in unsafe Rust, called unsafe superpowers, that you can’t in safe Rust. Those superpowers include the ability to:
 
-    - Dereference a raw pointer
-    - Call an unsafe function or method
-    - Access or modify a mutable static variable
-    - Implement an unsafe trait
-    - Access fields of unions
+   - Dereference a raw pointer
+   - Call an unsafe function or method
+   - Access or modify a mutable static variable
+   - Implement an unsafe trait
+   - Access fields of unions
 
- */
+*/
 
 fn main() {
     {
@@ -61,11 +61,11 @@ fn main() {
             }
         }
 
-        let mut v = vec![1,2,3,4,5,6];
+        let mut v = vec![1, 2, 3, 4, 5, 6];
         let r = &mut v[..];
         let (a, b) = split_at_mut(r, 3);
-        assert_eq!(a, &mut [1,2,3]);
-        assert_eq!(b, &mut [4,5,6]);
+        assert_eq!(a, &mut [1, 2, 3]);
+        assert_eq!(b, &mut [4, 5, 6]);
     }
 
     {

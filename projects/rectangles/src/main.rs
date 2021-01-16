@@ -2,12 +2,16 @@ fn main() {
     let w = 30;
     let h = 50;
     {
-        fn area(w: u32, h: u32) -> u64 { (w as u64) * (h as u64) }
+        fn area(w: u32, h: u32) -> u64 {
+            (w as u64) * (h as u64)
+        }
         println!("area for {} x {}: {}", w, h, area(w, h));
     }
 
     {
-        fn area(d: (u32, u32)) -> u64 { (d.0 as u64) * (d.1 as u64) }
+        fn area(d: (u32, u32)) -> u64 {
+            (d.0 as u64) * (d.1 as u64)
+        }
         println!("area for {} x {}: {}", w, h, area((w, h)));
     }
 
@@ -63,9 +67,14 @@ fn main() {
         for j in 0..rects.len() {
             for i in 0..rects.len() {
                 if i != j {
-                    println!("Can rect{} {:?} hold rect{} {:?}? {}",
-                    i+1, rects[i], j+1, rects[j],
-                    rects[i].can_hold(&rects[j]));
+                    println!(
+                        "Can rect{} {:?} hold rect{} {:?}? {}",
+                        i + 1,
+                        rects[i],
+                        j + 1,
+                        rects[j],
+                        rects[i].can_hold(&rects[j])
+                    );
                 }
             }
         }
@@ -75,7 +84,7 @@ fn main() {
         // Associated functions
 
         impl Rectangle {
-           fn square(size: u32) -> Rectangle {
+            fn square(size: u32) -> Rectangle {
                 Rectangle {
                     width: size,
                     height: size,
@@ -89,8 +98,12 @@ fn main() {
         };
 
         let sq = Rectangle::square(20);
-        println!("Rect {:?} can hold square {:?}? {}",
-        rect1, sq, rect1.can_hold(&sq));
+        println!(
+            "Rect {:?} can hold square {:?}? {}",
+            rect1,
+            sq,
+            rect1.can_hold(&sq)
+        );
     }
 
     {

@@ -160,8 +160,12 @@ fn main() {
     }
 
     {
-        let c = CustomSmartPointer { data: String::from("my stuff") };
-        let d = CustomSmartPointer { data: String::from("other stuff") };
+        let c = CustomSmartPointer {
+            data: String::from("my stuff"),
+        };
+        let d = CustomSmartPointer {
+            data: String::from("other stuff"),
+        };
         println!("CustomSmartPointers created: {:?}, {:?}", c, d);
         // Error: `explicit destructor calls not allowed`
         // c.drop();
@@ -179,7 +183,10 @@ fn main() {
         // Error: `value used here after move`
         // let c = Cons(4, Box::new(a));
 
-        let a = Rc::new(RcList::Cons(5, Rc::new(RcList::Cons(10, Rc::new(RcList::Nil)))));
+        let a = Rc::new(RcList::Cons(
+            5,
+            Rc::new(RcList::Cons(10, Rc::new(RcList::Nil))),
+        ));
         println!("count after creating a = {}", Rc::strong_count(&a));
         let b = RcList::Cons(3, Rc::clone(&a));
         println!("count after creating a = {}", Rc::strong_count(&a));
@@ -204,7 +211,10 @@ fn main() {
 
         let value = Rc::new(RefCell::new(5));
 
-        let a = Rc::new(RefCellList::Cons(Rc::clone(&value), Rc::new(RefCellList::Nil)));
+        let a = Rc::new(RefCellList::Cons(
+            Rc::clone(&value),
+            Rc::new(RefCellList::Nil),
+        ));
 
         let b = RefCellList::Cons(Rc::new(RefCell::new(3)), Rc::clone(&a));
         let c = RefCellList::Cons(Rc::new(RefCell::new(4)), Rc::clone(&a));
@@ -218,7 +228,10 @@ fn main() {
     {
         // Create a reference cycle
 
-        let a = Rc::new(SharedCellList::Cons(5, RefCell::new(Rc::new(SharedCellList::Nil))));
+        let a = Rc::new(SharedCellList::Cons(
+            5,
+            RefCell::new(Rc::new(SharedCellList::Nil)),
+        ));
 
         println!("a initial rc count = {}", Rc::strong_count(&a));
         println!("a next item = {:?}", a.tail());
@@ -266,7 +279,7 @@ fn main() {
             let branch = Rc::new(Node {
                 value: 5,
                 parent: RefCell::new(Weak::new()),
-                children: RefCell::new(vec![Rc::clone(&leaf)])
+                children: RefCell::new(vec![Rc::clone(&leaf)]),
             });
             *leaf.parent.borrow_mut() = Rc::downgrade(&branch);
 
@@ -281,7 +294,7 @@ fn main() {
             );
 
             println!(
-              "** leaf strong = {}, weak = {}",
+                "** leaf strong = {}, weak = {}",
                 Rc::strong_count(&leaf),
                 Rc::weak_count(&leaf),
             );

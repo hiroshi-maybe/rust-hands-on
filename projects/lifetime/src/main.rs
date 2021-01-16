@@ -92,14 +92,12 @@ fn main() {
         let novel = String::from("Call me Ishmael. Some years ago...");
         let first_sentence = novel.split('.').next().expect("Could not find a '.'");
         let it = ImportantExcerpt {
-            part: first_sentence
+            part: first_sentence,
         };
         println!("{}", it.part);
     }
 
-    let it = ImportantExcerpt {
-        part: "abc",
-    };
+    let it = ImportantExcerpt { part: "abc" };
 
     {
         // Lifetime Annotations in Method Definitions
@@ -120,17 +118,18 @@ fn main() {
 
     {
         use std::fmt::Display;
-        fn not_longest_with_an_announcement<'a, 'b, T>(
-            x: &'a str,
-            y: &'b str,
-            ann: T,
-        ) -> &'a str where T: Display
+        fn not_longest_with_an_announcement<'a, 'b, T>(x: &'a str, y: &'b str, ann: T) -> &'a str
+        where
+            T: Display,
         {
             println!("Announcement: {}", ann);
             println!("{} is never returned", y);
             x
         }
 
-        println!("{} is returned", not_longest_with_an_announcement("xxx", "yyy", 12345));
+        println!(
+            "{} is returned",
+            not_longest_with_an_announcement("xxx", "yyy", 12345)
+        );
     }
 }

@@ -13,7 +13,7 @@ struct Counter {
 }
 
 impl Counter {
-    fn new () -> Counter {
+    fn new() -> Counter {
         Counter { count: 0 }
     }
 }
@@ -38,16 +38,34 @@ mod tests {
     #[test]
     fn filters_by_size() {
         let shoes = vec![
-            Shoe { size: 10, style: String::from("sneaker") },
-            Shoe { size: 13, style: String::from("sandal") },
-            Shoe { size: 10, style: String::from("boot") },
+            Shoe {
+                size: 10,
+                style: String::from("sneaker"),
+            },
+            Shoe {
+                size: 13,
+                style: String::from("sandal"),
+            },
+            Shoe {
+                size: 10,
+                style: String::from("boot"),
+            },
         ];
 
         let in_my_size = shoes_in_my_size(shoes, 10);
-        assert_eq!(in_my_size, vec![
-            Shoe { size: 10, style: String::from("sneaker") },
-            Shoe { size: 10, style: String::from("boot") },
-        ]);
+        assert_eq!(
+            in_my_size,
+            vec![
+                Shoe {
+                    size: 10,
+                    style: String::from("sneaker")
+                },
+                Shoe {
+                    size: 10,
+                    style: String::from("boot")
+                },
+            ]
+        );
     }
 
     #[test]
@@ -74,7 +92,7 @@ mod tests {
         let sum: u32 = Counter::new()
             .zip(Counter::new().skip(1))
             .map(|(a, b)| a * b)
-            .filter(|x| x%3 == 0)
+            .filter(|x| x % 3 == 0)
             .sum();
 
         assert_eq!(sum, 18);

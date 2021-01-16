@@ -1,8 +1,8 @@
+use std::sync::mpsc::{self, Sender};
 use std::thread;
 use std::time::Duration;
-use std::sync::mpsc::{self, Sender};
 
-use std::sync::{Mutex, Arc};
+use std::sync::{Arc, Mutex};
 
 fn main() {
     println!("** 16-1 Using Threads to Run Code Simultaneously");

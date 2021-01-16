@@ -1,5 +1,5 @@
-use std::ops::Add;
 use std::fmt;
+use std::ops::Add;
 
 pub trait Iterator {
     type Item;
@@ -160,7 +160,7 @@ fn main() {
         }
         impl OutlinePrint for Point {}
 
-        let p = Point {x: 1, y: 2};
+        let p = Point { x: 1, y: 2 };
         println!("{:?}", p.outline_print());
     }
 

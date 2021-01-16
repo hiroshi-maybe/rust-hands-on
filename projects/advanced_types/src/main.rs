@@ -31,7 +31,7 @@ fn main() {
         // Dynamically Sized Types and the Sized Trait
 
         // Size is known at compile time
-        fn sized_generic<T/* :Sized */>(t: T) -> T {
+        fn sized_generic<T /* :Sized */>(t: T) -> T {
             t
         }
 

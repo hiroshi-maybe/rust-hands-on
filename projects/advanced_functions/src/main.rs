@@ -2,8 +2,10 @@ fn main() {
     {
         // Function Pointers
 
-        fn add_one(x: i32) -> i32 { x + 1 }
-        let closure = |p| { p + 1 };
+        fn add_one(x: i32) -> i32 {
+            x + 1
+        }
+        let closure = |p| p + 1;
 
         fn do_twice(f: fn(i32) -> i32, arg: i32) -> i32 {
             f(arg) + f(arg)
@@ -50,7 +52,9 @@ fn main() {
         // doesn't have a size known at compile-time
         // ```
         // fn returns_closure() -> dyn Fn(i32) -> i32 { |x| x + 1 }
-        fn returns_closure() -> Box<dyn Fn(i32) -> i32> { Box::new(|x| x + 1) }
+        fn returns_closure() -> Box<dyn Fn(i32) -> i32> {
+            Box::new(|x| x + 1)
+        }
 
         let c = returns_closure();
         println!("From returned closure: {}", (*c)(1));

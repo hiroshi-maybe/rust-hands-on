@@ -52,7 +52,9 @@ mod tests {
         assert!(!smaller.can_hold(&larger));
     }
 
-    fn add_two(a: i32) -> i32 { a + 2 }
+    fn add_two(a: i32) -> i32 {
+        a + 2
+    }
 
     #[test]
     fn it_adds_two() {

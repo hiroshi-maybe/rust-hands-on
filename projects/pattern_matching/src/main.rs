@@ -12,7 +12,7 @@ fn main() {
             println!("Using your favorite color, {}, as the background", color);
         } else if is_tuesday {
             println!("Tuesday is green day!");
-        } else if let Ok(age) = age{
+        } else if let Ok(age) = age {
             if age > 30 {
                 println!("Using purple as the background color");
             } else {
@@ -44,7 +44,7 @@ fn main() {
     {
         // let Statements
 
-        let (x,y, ..) = (1,2,3,4);
+        let (x, y, ..) = (1, 2, 3, 4);
 
         println!("let ({},{},..) = (1,2,3,4)", x, y);
     }
@@ -56,7 +56,7 @@ fn main() {
             println!("Current location: ({}, {})", x, y);
         }
 
-        print_coordinates(&(3,5));
+        print_coordinates(&(3, 5));
     }
 
     // Ch 18-2 Refutability: Whether a Pattern Might Fail to Match
@@ -64,7 +64,9 @@ fn main() {
     {
         let xs = vec![Some(1), None, Some(2)];
 
-        for /*let .Some(x)*/ x in xs {
+        for
+        /*let .Some(x)*/
+        x in xs {
             println!("{:?}", x);
         }
     }
@@ -119,8 +121,11 @@ fn main() {
     {
         // Destructuring to Break Apart Values
 
-        struct Point { x: i32, y: i32, }
-        let p = Point { x: 0, y: 7};
+        struct Point {
+            x: i32,
+            y: i32,
+        }
+        let p = Point { x: 0, y: 7 };
         //let Point { x: x, y: y } = p;
         let Point { x, y } = p;
         assert_eq!(x, 0);
@@ -139,7 +144,10 @@ fn main() {
         }
 
         enum Message {
-            Quit, Move { x: i32, y: i32 }, Write(String), ChangeColor(Color),
+            Quit,
+            Move { x: i32, y: i32 },
+            Write(String),
+            ChangeColor(Color),
         }
 
         let m = Message::ChangeColor(Color::Rgb(0, 160, 255));
@@ -149,7 +157,7 @@ fn main() {
                 Message::Quit => println!("Quit variant"),
                 Message::Move { x, y } => {
                     println!("Move in the x direction {} and y direction {}", x, y);
-                },
+                }
                 Message::Write(text) => println!("Text message: {}", text),
                 Message::ChangeColor(color) => println!("Change the color to {:?}", color),
             }
@@ -159,8 +167,12 @@ fn main() {
 
         let mm = Message::ChangeColor(Color::Hsv(0, 1, 2));
         match mm {
-            Message::ChangeColor(Color::Rgb(r, g, b)) => println!("To red {}, green {}, blue {}", r, g, b),
-            Message::ChangeColor(Color::Hsv(h, s, v)) => println!("To hue {}, saturation {}, value {}", h, s, v),
+            Message::ChangeColor(Color::Rgb(r, g, b)) => {
+                println!("To red {}, green {}, blue {}", r, g, b)
+            }
+            Message::ChangeColor(Color::Hsv(h, s, v)) => {
+                println!("To hue {}, saturation {}, value {}", h, s, v)
+            }
             _ => (),
         }
 
@@ -176,7 +188,7 @@ fn main() {
         match (setting_value, new_setting_value) {
             (Some(_), Some(_)) => {
                 println!("Can' overwrite and existing value");
-            },
+            }
             _ => {
                 setting_value = new_setting_value;
             }
@@ -187,13 +199,17 @@ fn main() {
         let s = Some(String::from("Hello!"));
 
         if let Some(_) = s {
-        // ownership error
-        // if let Some(_s) = s {
+            // ownership error
+            // if let Some(_s) = s {
             println!("found a string");
         }
         println!("{:?}", s);
 
-        struct Point { x: i32, y: i32, z: i32 }
+        struct Point {
+            x: i32,
+            y: i32,
+            z: i32,
+        }
         let o = Point { x: 0, y: 0, z: 0 };
         match o {
             Point { x, .. } => println!("x is {}", x),
@@ -234,11 +250,11 @@ fn main() {
         }
         let m = Message::Hello { id: 5 };
         match m {
-            Message::Hello { id: id @ 3..=7} => {
-            // above is shorter with @ binding
-            //Message::Hello { id } if 3<=id && id<=7 => {
+            Message::Hello { id: id @ 3..=7 } => {
+                // above is shorter with @ binding
+                //Message::Hello { id } if 3<=id && id<=7 => {
                 println!("found id {}", id);
-            },
+            }
             Message::Hello { id: 10..=12 } => println!("found in another range"),
             Message::Hello { id } => println!("Some other id: {}", id),
         }

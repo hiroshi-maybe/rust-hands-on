@@ -1,4 +1,4 @@
-use traits::{Tweet, Summary, MyDiary, NewsArticle, Display};
+use traits::{Display, MyDiary, NewsArticle, Summary, Tweet};
 
 fn main() {
     // Implementing a Trait on a Type
@@ -21,7 +21,6 @@ fn main() {
         content: String::from("abc"),
     };
     println!("News: {}", news.summarize());
-
 
     {
         // Traits as Parameters
@@ -54,7 +53,8 @@ fn main() {
         notify_to_display(&tweet);
 
         fn notify_to_display2<T>(item: &T)
-            where T: Summary + Display
+        where
+            T: Summary + Display,
         {
             println!("{}", item.summarize());
         }
@@ -67,9 +67,11 @@ fn main() {
         fn returns_summarizable() -> impl Summary {
             MyDiary {}
         }
-        println!("Returns summarizabe: {:?}", returns_summarizable().summarize());
+        println!(
+            "Returns summarizabe: {:?}",
+            returns_summarizable().summarize()
+        );
     }
-
 
     {
         // Back to largest()
@@ -96,11 +98,11 @@ fn main() {
             res
         }
 
-        let nums = vec![1,2,3,4,5];
+        let nums = vec![1, 2, 3, 4, 5];
         let res = largest(&nums);
         println!("The largest number is {}", res);
 
-        let chars = vec!['a','b','c','d'];
+        let chars = vec!['a', 'b', 'c', 'd'];
         let res = largest_borrow(&chars);
         println!("The largest char is {}", res);
     }

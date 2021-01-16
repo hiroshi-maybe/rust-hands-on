@@ -65,7 +65,7 @@ fn main() {
 
     {
         let q = Message::Quit;
-        let m = Message::Move {x: 1, y: 2};
+        let m = Message::Move { x: 1, y: 2 };
         let w = Message::Write(String::from("abc"));
         let c = Message::ChangeColor(1, 2, 3);
 

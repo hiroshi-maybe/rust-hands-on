@@ -17,9 +17,7 @@ fn main() {
         let teams = vec!["Blue", "Yellow"];
         let initial_scores = vec![10, 50];
 
-        let scores1: HashMap<_,_> = teams.into_iter()
-            .zip(initial_scores.into_iter())
-            .collect();
+        let scores1: HashMap<_, _> = teams.into_iter().zip(initial_scores.into_iter()).collect();
 
         for (key, value) in &scores1 {
             println!("{} -> {}", key, value);
@@ -35,7 +33,8 @@ fn main() {
         let teams2 = vec!["Blue", "Yellow"];
         let initial_scores2 = vec![10, 10];
 
-        let scores2: HashMap<_,_> = initial_scores2.into_iter()
+        let scores2: HashMap<_, _> = initial_scores2
+            .into_iter()
             .zip(teams2.into_iter())
             .collect();
 
@@ -63,7 +62,7 @@ fn main() {
     {
         let text = "hello world wonderful world";
         let mut map = HashMap::new();
-        let mut a=0;
+        let mut a = 0;
         for word in text.split_whitespace() {
             let cnt = map.entry(word).or_insert(0);
             *cnt += 1;
@@ -83,7 +82,7 @@ fn main() {
 
         let text = "hello world wonderful world";
         let mut map = HashMap::new();
-        let mut a=Counter { val: 0 };
+        let mut a = Counter { val: 0 };
         for word in text.split_whitespace() {
             let cnt = map.entry(word).or_insert(Counter { val: 0 });
             cnt.val += 1;

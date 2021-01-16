@@ -6,7 +6,13 @@ fn main() {
         let s2 = "initial contents".to_string();
         let s3 = String::from("initial contents");
 
-        println!("\"{}\" = \"{}\" = \"{}\"? {}", s1, s2, s3, s1==s2 && s2==s3);
+        println!(
+            "\"{}\" = \"{}\" = \"{}\"? {}",
+            s1,
+            s2,
+            s3,
+            s1 == s2 && s2 == s3
+        );
     }
 
     {
@@ -56,7 +62,12 @@ fn main() {
         let ga = String::from("あ");
         let strs = [hello1, hello2, emoji, ga];
         for s in &strs {
-            println!("{} is {} bytes, {} unicode chars", s, s.len(), s.chars().count());
+            println!(
+                "{} is {} bytes, {} unicode chars",
+                s,
+                s.len(),
+                s.chars().count()
+            );
         }
     }
 }

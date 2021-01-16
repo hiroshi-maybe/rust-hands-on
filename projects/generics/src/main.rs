@@ -15,12 +15,14 @@ fn main() {
         fn largest_i32(list: &[i32]) -> &i32 {
             let mut largest = &list[0];
             for item in list {
-                if item > largest { largest = item; }
+                if item > largest {
+                    largest = item;
+                }
             }
             largest
         }
 
-        let nums = vec![1,2,3,4,5];
+        let nums = vec![1, 2, 3, 4, 5];
         let res = largest_i32(&nums);
         println!("The largest number is {}", res);
     }
@@ -30,7 +32,8 @@ fn main() {
 
         #[derive(Debug)]
         struct Point<T, U> {
-            x: T, y: U,
+            x: T,
+            y: U,
         }
 
         let a = Point { x: 1, y: 2 };
@@ -43,7 +46,7 @@ fn main() {
         #[derive(Debug)]
         enum TreeNode<T> {
             Node(T),
-            Branch(Box<TreeNode<T>>, Box<TreeNode<T>>)
+            Branch(Box<TreeNode<T>>, Box<TreeNode<T>>),
         }
 
         let tree = TreeNode::Branch(
@@ -54,7 +57,7 @@ fn main() {
                     Box::new(TreeNode::Node(3)),
                 )),
                 Box::new(TreeNode::Node(4)),
-            ))
+            )),
         );
 
         println!("{:?}", tree);
@@ -65,7 +68,8 @@ fn main() {
 
         #[derive(Debug)]
         struct Point<T> {
-            x: T, y: T,
+            x: T,
+            y: T,
         }
         impl<T> Point<T> {
             fn x(&self) -> &T {

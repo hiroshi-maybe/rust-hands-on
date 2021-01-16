@@ -19,7 +19,6 @@
 
 */
 
-
 fn main() {
     {
         // Immutable string literal
@@ -123,14 +122,19 @@ fn main() {
         // println!("{}", s1);
         println!("given string along with ownership: {}", s2);
 
-        fn takes_and_gives_back(s: String) -> String { s }
+        fn takes_and_gives_back(s: String) -> String {
+            s
+        }
     }
 
     {
         // Reuse data by returning from a function with ownership
         let s1 = String::from("hello");
         let (s2, len) = calc_length(s1);
-        println!("{} is returned back from a function with length {}", s2, len);
+        println!(
+            "{} is returned back from a function with length {}",
+            s2, len
+        );
 
         fn calc_length(s: String) -> (String, usize) {
             // This gives compile-time error because s is moved in the first item of the tuple
@@ -141,16 +145,24 @@ fn main() {
         }
 
         let (len, s1) = calc_length2(s2);
-        println!("{} is returned back from a function with length {}", s1, len);
+        println!(
+            "{} is returned back from a function with length {}",
+            s1, len
+        );
 
-        fn calc_length2(s: String) -> (usize, String) { (s.len(), s) }
+        fn calc_length2(s: String) -> (usize, String) {
+            (s.len(), s)
+        }
     }
 
     {
         // Borrow data by reference
         let s1 = String::from("hello");
         let len = calc_length(&s1);
-        println!("{} is borrowed by a function which returned length {}", s1, len);
+        println!(
+            "{} is borrowed by a function which returned length {}",
+            s1, len
+        );
 
         fn calc_length(s: &String) -> usize {
             // Cannot be mutated beause it's borrowed by immutable reference
@@ -162,7 +174,10 @@ fn main() {
 
         let s1 = "hello";
         let len = calc_length2(s1);
-        println!("String literal {} forces borrowing it and returned length is {}", s1, len);
+        println!(
+            "String literal {} forces borrowing it and returned length is {}",
+            s1, len
+        );
 
         fn calc_length2(s: &str) -> usize {
             s.len()

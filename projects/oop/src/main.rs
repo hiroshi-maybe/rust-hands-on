@@ -1,8 +1,7 @@
 fn main() {
-
     {
         // Ch 17-2 Using Trait Objects That Allow for Values of Different Types
-        use oop::{Button, SelectBox, Screen};
+        use oop::{Button, Screen, SelectBox};
 
         let screen = Screen {
             components: vec![
@@ -19,7 +18,7 @@ fn main() {
                     width: 50,
                     height: 10,
                     label: String::from("OK"),
-                })
+                }),
             ],
         };
 
