@@ -8,6 +8,7 @@ mod udp_server;
 
 // client
 // $ telnet 127.0.0.1 33333
+// $ cargo run tcp client 127.0.0.1:33333
 
 // server
 // $ cargo run tcp server 127.0.0.1:33333
@@ -32,7 +33,7 @@ fn main() {
                 tcp_server::serve(address).unwrap_or_else(|e| error!("{}", e));
             },
             "client" => {
-
+                tcp_client::connect(address).unwrap_or_else(|e| error!("{}", e));
             },
             _ => {
                 missing_role();
