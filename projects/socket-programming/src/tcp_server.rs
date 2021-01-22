@@ -16,7 +16,7 @@ pub fn serve(address: &str) -> Result<(), failure::Error> {
 // Echo incoming request body
 fn handler(mut stream: TcpStream) -> Result<(), failure::Error> {
     debug!("Handling data from {}", stream.peer_addr()?);
-    let mut buffer = [0u8; 3];
+    let mut buffer = [0u8; 1024];
     loop {
         debug!("waiting for stream...");
         let nbytes = stream.read(&mut buffer)?;

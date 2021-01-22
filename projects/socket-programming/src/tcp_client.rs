@@ -1,4 +1,4 @@
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::str;
 
@@ -6,16 +6,13 @@ use std::str;
 pub fn connect(address: &str) -> Result<(), failure::Error> {
     let mut stream = TcpStream::connect(address).expect("Couldn't connect to the server...");
     loop {
-        let mut wbuffer = [0u8; 5];
-        let stdin = io::stdin();
-        let mut handle = stdin.lock();
-        let bytes = handle.read(&mut wbuffer)?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        stream.write_all(input.as_bytes())?;
 
-        println!("size of input: {}", bytes);
-        stream.write_all(&wbuffer[..bytes])?;
-
-        let mut rbuffer = [0u8; 1024];
-        let bytes = stream.read(&mut rbuffer)?;
-        println!("Response: {}", str::from_utf8(&rbuffer[..bytes])?);
+        let mut reader = BufReader::new(&stream);
+        let mut buffer = Vec::new();
+        reader.read_until(b'\n', &mut buffer)?;
+        println!("Response: {}", str::from_utf8(&buffer)?);
     }
 }
