@@ -38,10 +38,10 @@ fn main() {
         "tcp" => match role {
             "server" => {
                 tcp_server::serve(address).unwrap_or_else(|e| error!("{}", e));
-            },
+            }
             "client" => {
                 tcp_client::connect(address).unwrap_or_else(|e| error!("{}", e));
-            },
+            }
             _ => {
                 missing_role();
             }
@@ -49,10 +49,8 @@ fn main() {
         "udp" => match role {
             "server" => {
                 udp_server::serve(address).unwrap_or_else(|e| error!("{}", e));
-            },
-            "client" => {
-
-            },
+            }
+            "client" => {}
             _ => {
                 missing_role();
             }
