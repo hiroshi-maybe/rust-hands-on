@@ -17,8 +17,11 @@ pub fn serve(address: &str) -> Result<(), failure::Error> {
 fn handler(mut stream: TcpStream) -> Result<(), failure::Error> {
     debug!("Handling data from {}", stream.peer_addr()?);
     let mut buffer = [0u8; 1024];
+
+    let mut cnt = 0;
     loop {
-        debug!("waiting for stream...");
+        cnt += 1;
+        debug!("waiting for stream...{}", cnt);
         let nbytes = stream.read(&mut buffer)?;
         if nbytes == 0 {
             debug!("Connection closed.");

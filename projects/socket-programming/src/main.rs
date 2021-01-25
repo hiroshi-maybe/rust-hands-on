@@ -6,13 +6,20 @@ mod tcp_server;
 mod udp_client;
 mod udp_server;
 
-// client
-// $ telnet 127.0.0.1 33333
-// $ cargo run tcp client 127.0.0.1:33333
-
-// server
-// $ cargo run tcp server 127.0.0.1:33333
-
+/// Usage:
+///
+/// # Client
+/// ## TCP
+/// $ telnet 127.0.0.1 33333
+/// $ cargo run tcp client 127.0.0.1:33333
+/// ## UDP
+/// $ nc -u 127.0.0.1 33333
+///
+/// # Server
+/// ## TCP
+/// $ cargo run tcp server 127.0.0.1:33333
+/// ## UDP
+/// $ cargo run udp server 127.0.0.1:33333
 fn main() {
     env::set_var("RUST_LOG", "debug");
     env_logger::init();
@@ -41,7 +48,7 @@ fn main() {
         },
         "udp" => match role {
             "server" => {
-
+                udp_server::serve(address).unwrap_or_else(|e| error!("{}", e));
             },
             "client" => {
 
