@@ -14,6 +14,7 @@ mod udp_server;
 /// $ cargo run tcp client 127.0.0.1:33333
 /// ## UDP
 /// $ nc -u 127.0.0.1 33333
+/// $ cargo run udp client 127.0.0.1:33333
 ///
 /// # Server
 /// ## TCP
@@ -50,7 +51,9 @@ fn main() {
             "server" => {
                 udp_server::serve(address).unwrap_or_else(|e| error!("{}", e));
             }
-            "client" => {}
+            "client" => {
+                udp_client::communicate(address).unwrap_or_else(|e| error!("{}", e));
+            }
             _ => {
                 missing_role();
             }
