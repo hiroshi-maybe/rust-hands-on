@@ -2,6 +2,9 @@ use log::{error, info};
 use pnet::datalink;
 use pnet::datalink::Channel::Ethernet;
 use pnet::packet::ethernet::{EthernetPacket, EtherTypes};
+use pnet::packet::ip::IpNextHeaderProtocols;
+use pnet::packet::ipv4::Ipv4Packet;
+use pnet::packet::Packet;
 use std::env;
 
 fn main() {
@@ -26,6 +29,7 @@ fn main() {
     loop {
         match rx.next() {
             Ok(frame) => {
+                // Build ethernet packet
                 let frame = EthernetPacket::new(frame).unwrap();
                 match frame.get_ethertype() {
                     EtherTypes::Ipv4 => {
@@ -35,7 +39,7 @@ fn main() {
                         ipv6_handler(&frame);
                     },
                     _ => {
-                        info!("Neither an IPv4 nor IPv6 packet");
+                        info!("Neither IPv4 nor IPv6 packet");
                     }
                 }
             },
@@ -46,5 +50,27 @@ fn main() {
     }
 }
 
-fn ipv4_handler(ethernet: &EthernetPacket) {}
+// Build IPv4 packet from ethernet packet
+fn ipv4_handler(ethernet: &EthernetPacket) {
+    match Ipv4Packet::new(ethernet.payload()) {
+        Some(packet) => {
+            match packet.get_next_level_protocol() {
+                IpNextHeaderProtocols::Tcp => {
+                    //tcp_handler(&packet);
+                },
+                IpNextHeaderProtocols::Udp => {
+                    //udp_handler(&packet);
+                },
+                _ => {
+                    info!("Neither TCP nor UDP packet")
+                }
+            }
+        },
+        None => {
+            error!("Failed to restore IPv4 packet");
+        }
+    }
+
+}
 fn ipv6_handler(ethernet: &EthernetPacket) {}
+//fn tcp_handler(packet: &GettableEndPoints) {}
