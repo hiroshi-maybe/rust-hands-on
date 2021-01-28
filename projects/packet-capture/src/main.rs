@@ -4,6 +4,7 @@ use pnet::datalink::Channel::Ethernet;
 use pnet::packet::ethernet::{EthernetPacket, EtherTypes};
 use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::packet::ipv4::Ipv4Packet;
+use pnet::packet::ipv6::Ipv6Packet;
 use pnet::packet::Packet;
 use std::env;
 
@@ -70,7 +71,26 @@ fn ipv4_handler(ethernet: &EthernetPacket) {
             error!("Failed to restore IPv4 packet");
         }
     }
+}
+fn ipv6_handler(ethernet: &EthernetPacket) {
+    match Ipv6Packet::new(ethernet.payload()) {
+        Some(packet) => {
+            match packet.get_next_header() {
+                IpNextHeaderProtocols::Tcp => {
+                    //tcp_handler(&packet);
+                },
+                IpNextHeaderProtocols::Udp => {
+                    //udp_handler(&packet);
+                },
+                _ => {
+                    info!("Neither TCP nor UDP packet")
+                }
+            }
+        },
+        None => {
+            error!("Failed to restore IPv4 packet");
+        }
+    }
 
 }
-fn ipv6_handler(ethernet: &EthernetPacket) {}
 //fn tcp_handler(packet: &GettableEndPoints) {}
