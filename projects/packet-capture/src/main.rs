@@ -15,6 +15,17 @@ use packets::GettableEndPoints;
 
 const WIDTH: usize = 20;
 
+/// # How to run for Mac OS?
+///
+/// Install command line tool
+/// $ brew install iproute2mac
+/// Show a list of network interfaces. Look at MAC address in the Network settings and find corresponding network interface.
+/// $ ip link show
+///
+///
+/// $ cargo build
+/// $ sudo ./target/debug/packet-capture en0
+
 fn main() {
     env::set_var("RUST_LOG", "debug");
     env_logger::init();
