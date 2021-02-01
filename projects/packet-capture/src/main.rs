@@ -1,7 +1,7 @@
 use log::{error, info};
 use pnet::datalink;
 use pnet::datalink::Channel::Ethernet;
-use pnet::packet::ethernet::{EthernetPacket, EtherTypes};
+use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
 use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::packet::ipv4::Ipv4Packet;
 use pnet::packet::ipv6::Ipv6Packet;
@@ -37,7 +37,10 @@ fn main() {
     let interface_name = &args[1];
 
     let interfaces = datalink::interfaces();
-    let interface = interfaces.into_iter().find(|iface| iface.name == *interface_name).expect("Failed to get interface");
+    let interface = interfaces
+        .into_iter()
+        .find(|iface| iface.name == *interface_name)
+        .expect("Failed to get interface");
 
     let (_tx, mut rx) = match datalink::channel(&interface, Default::default()) {
         Ok(Ethernet(tx, rx)) => (tx, rx),
@@ -53,15 +56,15 @@ fn main() {
                 match frame.get_ethertype() {
                     EtherTypes::Ipv4 => {
                         ipv4_handler(&frame);
-                    },
+                    }
                     EtherTypes::Ipv6 => {
                         ipv6_handler(&frame);
-                    },
+                    }
                     _ => {
                         info!("Neither IPv4 nor IPv6 packet");
                     }
                 }
-            },
+            }
             Err(e) => {
                 error!("Failed to read: {}", e);
             }
@@ -72,18 +75,14 @@ fn main() {
 // Build IPv4 packet from ethernet packet
 fn ipv4_handler(ethernet: &EthernetPacket) {
     match Ipv4Packet::new(ethernet.payload()) {
-        Some(packet) => {
-            match packet.get_next_level_protocol() {
-                IpNextHeaderProtocols::Tcp => {
-                    tcp_handler(&packet);
-                },
-                IpNextHeaderProtocols::Udp => {
-                    udp_handler(&packet);
-                },
-                _ => {
-                    info!("Neither TCP nor UDP packet")
-                }
+        Some(packet) => match packet.get_next_level_protocol() {
+            IpNextHeaderProtocols::Tcp => {
+                tcp_handler(&packet);
             }
+            IpNextHeaderProtocols::Udp => {
+                udp_handler(&packet);
+            }
+            _ => info!("Neither TCP nor UDP packet"),
         },
         None => {
             error!("Failed to restore IPv4 packet");
@@ -92,24 +91,19 @@ fn ipv4_handler(ethernet: &EthernetPacket) {
 }
 fn ipv6_handler(ethernet: &EthernetPacket) {
     match Ipv6Packet::new(ethernet.payload()) {
-        Some(packet) => {
-            match packet.get_next_header() {
-                IpNextHeaderProtocols::Tcp => {
-                    tcp_handler(&packet);
-                },
-                IpNextHeaderProtocols::Udp => {
-                    udp_handler(&packet);
-                },
-                _ => {
-                    info!("Neither TCP nor UDP packet")
-                }
+        Some(packet) => match packet.get_next_header() {
+            IpNextHeaderProtocols::Tcp => {
+                tcp_handler(&packet);
             }
+            IpNextHeaderProtocols::Udp => {
+                udp_handler(&packet);
+            }
+            _ => info!("Neither TCP nor UDP packet"),
         },
         None => {
             error!("Failed to restore IPv4 packet");
         }
     }
-
 }
 fn tcp_handler(packet: &dyn GettableEndPoints) {
     let tcp = TcpPacket::new(packet.get_payload());
@@ -154,6 +148,6 @@ fn print_packet_info(l3: &dyn GettableEndPoints, l4: &dyn GettableEndPoints, pro
             println!();
         }
     }
-    println!("{}","=".repeat(WIDTH * 3));
+    println!("{}", "=".repeat(WIDTH * 3));
     println!();
 }
