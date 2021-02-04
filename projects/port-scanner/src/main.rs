@@ -86,8 +86,9 @@ fn main() {
 
     let (mut ts, mut tr) = transport::transport_channel(
         1024,
-        TransportChannelType::Layer4(TransportProtocol::Ipv4(IpNextHeaderProtocols::Tcp))
-    ).expect("Failed to open channel.");
+        TransportChannelType::Layer4(TransportProtocol::Ipv4(IpNextHeaderProtocols::Tcp)),
+    )
+    .expect("Failed to open channel.");
 
     send_packets(&mut ts, &packet_info);
 }
@@ -98,7 +99,8 @@ fn send_packets(ts: &mut transport::TransportSender, packet_info: &PacketInfo) {
         let mut tcp_header = tcp::MutableTcpPacket::new(&mut packet).unwrap();
         reregister_destination_port(port, &mut tcp_header, packet_info);
         thread::sleep(time::Duration::from_millis(5));
-        ts.send_to(tcp_header, net::IpAddr::V4(packet_info.target_ipaddr)).expect("failed to send a packet");
+        ts.send_to(tcp_header, net::IpAddr::V4(packet_info.target_ipaddr))
+            .expect("failed to send a packet");
     }
 }
 
@@ -122,10 +124,7 @@ fn build_packet(packet_info: &PacketInfo) -> [u8; TCP_SIZE] {
     tcp_buffer
 }
 
-fn set_checksum(
-    tcp_header: &mut MutableTcpPacket,
-    packet_info: &PacketInfo,
-) {
+fn set_checksum(tcp_header: &mut MutableTcpPacket, packet_info: &PacketInfo) {
     let checksum = tcp::ipv4_checksum(
         &tcp_header.to_immutable(),
         &packet_info.my_ipaddr,
