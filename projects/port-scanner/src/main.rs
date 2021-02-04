@@ -6,8 +6,10 @@ use pnet::transport::{self, TransportChannelType, TransportProtocol};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::net::Ipv4Addr;
+use std::net::{self, Ipv4Addr};
 use std::process;
+use std::thread;
+use std::time;
 
 /// Usage:
 /// $ cargo run 127.0.0.1 sS
@@ -86,6 +88,27 @@ fn main() {
         1024,
         TransportChannelType::Layer4(TransportProtocol::Ipv4(IpNextHeaderProtocols::Tcp))
     ).expect("Failed to open channel.");
+
+    send_packets(&mut ts, &packet_info);
+}
+
+fn send_packets(ts: &mut transport::TransportSender, packet_info: &PacketInfo) {
+    let mut packet = build_packet(packet_info);
+    for port in 1..packet_info.maximum_port {
+        let mut tcp_header = tcp::MutableTcpPacket::new(&mut packet).unwrap();
+        reregister_destination_port(port, &mut tcp_header, packet_info);
+        thread::sleep(time::Duration::from_millis(5));
+        ts.send_to(tcp_header, net::IpAddr::V4(packet_info.target_ipaddr)).expect("failed to send a packet");
+    }
+}
+
+fn reregister_destination_port(
+    target: u16,
+    tcp_header: &mut MutableTcpPacket,
+    packet_info: &PacketInfo,
+) {
+    tcp_header.set_destination(target);
+    set_checksum(tcp_header, packet_info);
 }
 
 fn build_packet(packet_info: &PacketInfo) -> [u8; TCP_SIZE] {
