@@ -1,8 +1,9 @@
 #[macro_use]
 extern crate log;
+extern crate rayon;
 use pnet::packet::ip::IpNextHeaderProtocols;
-use pnet::packet::tcp::{self, MutableTcpPacket, TcpFlags};
-use pnet::transport::{self, TransportChannelType, TransportProtocol};
+use pnet::packet::tcp::{self, MutableTcpPacket, TcpFlags, TcpPacket};
+use pnet::transport::{self, TcpTransportChannelIterator, TransportChannelType, TransportProtocol};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -13,6 +14,7 @@ use std::time;
 
 /// Usage:
 /// $ cargo run 127.0.0.1 sS
+/// $ sudo ./target/debug/port-scanner 127.0.0.1 sS
 
 const TCP_SIZE: usize = 20;
 const SYN_METHOD: &str = "sS";
@@ -31,10 +33,10 @@ struct PacketInfo {
 
 #[derive(Copy, Clone, Debug)]
 enum ScanType {
-    Syn = TcpFlags::SYN as isize,
-    Fin = TcpFlags::FIN as isize,
-    Xmas = (TcpFlags::FIN | TcpFlags::URG | TcpFlags::PSH) as isize,
-    Null = 0,
+    SynScan = TcpFlags::SYN as isize,
+    FinScan = TcpFlags::FIN as isize,
+    XmasScan = (TcpFlags::FIN | TcpFlags::URG | TcpFlags::PSH) as isize,
+    NullScan = 0,
 }
 
 fn main() {
@@ -67,10 +69,10 @@ fn main() {
                 .parse()
                 .expect("invalid maximum port num"),
             scan_type: match args[2].as_str() {
-                SYN_METHOD => ScanType::Syn,
-                FIN_METHOD => ScanType::Fin,
-                XMAX_METHOD => ScanType::Xmas,
-                NULL_METHOD => ScanType::Null,
+                SYN_METHOD => ScanType::SynScan,
+                FIN_METHOD => ScanType::FinScan,
+                XMAX_METHOD => ScanType::XmasScan,
+                NULL_METHOD => ScanType::NullScan,
                 _ => {
                     error!(
                         "Undefined scan method, only accept [{}|{}|{}|{}].",
@@ -90,7 +92,10 @@ fn main() {
     )
     .expect("Failed to open channel.");
 
-    send_packets(&mut ts, &packet_info);
+    rayon::join(
+        || send_packets(&mut ts, &packet_info),
+        || receive_packets(&mut tr, &packet_info)
+    );
 }
 
 fn send_packets(ts: &mut transport::TransportSender, packet_info: &PacketInfo) {
@@ -101,6 +106,71 @@ fn send_packets(ts: &mut transport::TransportSender, packet_info: &PacketInfo) {
         thread::sleep(time::Duration::from_millis(5));
         ts.send_to(tcp_header, net::IpAddr::V4(packet_info.target_ipaddr))
             .expect("failed to send a packet");
+        println!("Port {} sent", port);
+    }
+}
+
+fn receive_packets(
+    tr: &mut transport::TransportReceiver,
+    packet_info: &PacketInfo,
+) {
+    let mut packet_iter = transport::tcp_packet_iter(tr);
+
+    let res = match packet_info.scan_type {
+        ScanType::SynScan => {
+            receive_syn_packets(&mut packet_iter, packet_info)
+        },
+        ScanType::FinScan | ScanType::XmasScan | ScanType::NullScan => {
+            receive_replied_packets(&mut packet_iter, packet_info)
+        },
+    };
+
+    for port in 1..packet_info.maximum_port + 1 {
+        println!("Port {}: {}", port, if res[port as usize] { "✅" } else { "❌" });
+    }
+}
+
+fn receive_syn_packets(iter: &mut TcpTransportChannelIterator, packet_info: &PacketInfo) -> Vec<bool> {
+    let mut scan_result = vec![false; (packet_info.maximum_port + 1) as usize];
+    let mut count = 0;
+    while count < packet_info.maximum_port {
+        let tcp_packet = match next_packet(iter, packet_info) {
+            Some(t) => t,
+            None => continue
+        };
+
+        let target_port = tcp_packet.get_source();
+        if target_port > packet_info.maximum_port {
+            panic!("Unexpected target port: {}", target_port);
+        }
+
+        println!("Port {} received", target_port);
+        if tcp_packet.get_flags() == tcp::TcpFlags::SYN | tcp::TcpFlags::ACK {
+            scan_result[target_port as usize] = true;
+        }
+
+        count += 1;
+    }
+
+    scan_result
+}
+
+fn receive_replied_packets(iter: &mut TcpTransportChannelIterator, packet_info: &PacketInfo) -> Vec<bool> {
+    let mut scan_result = vec![false; (packet_info.maximum_port + 1) as usize];
+    scan_result
+}
+
+fn next_packet<'a>(iter: &'a mut TcpTransportChannelIterator, packet_info: &PacketInfo) -> Option<TcpPacket<'a>> {
+    println!("next_packet");
+    match iter.next() {
+        Ok((tcp_packet, _)) => {
+            if tcp_packet.get_destination() == packet_info.my_port {
+                Some(tcp_packet)
+            } else {
+                None
+            }
+        }
+        Err(_) => None
     }
 }
 
