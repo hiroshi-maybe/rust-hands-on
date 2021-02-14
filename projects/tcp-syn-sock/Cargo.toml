@@ -1,0 +1,12 @@
+[package]
+name = "tcp-syn-sock"
+version = "0.1.0"
+authors = ["Hiroshi Kori <hiroshi.maybe@gmail.com>"]
+edition = "2018"
+
+[[bin]]
+name = "tcp-syn-sock"
+src = "src/main.rs"
+
+[dependencies]
+pnet = { path = "./libpnet" }
