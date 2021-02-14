@@ -18,7 +18,9 @@ const NIF_NAME: &str = "en0";
 const TARGET_IPADDR: &str = "10.0.1.1";
 const TCP_SIZE: usize = 20;
 const SRC_PORT: u16 = 33333;
-const DEST_PORT: u16 = 47;
+const DEST_PORT: u16 = 53;
+const OPEN_FLAG: isize = (TcpFlags::SYN as isize) | (TcpFlags::ACK as isize);
+const CLOSE_FLAG: isize = (TcpFlags::RST as isize) | (TcpFlags::ACK as isize);
 
 /// I figured out that raw IP datagram is never passed in Mac OS (Free BSD).
 /// https://stackoverflow.com/questions/6878603/strange-raw-socket-on-mac-os-x
@@ -70,7 +72,12 @@ fn retrieve_tcp_packet_from_ipv4(p: &Ipv4Packet) {
             let p = p.payload();
             let p = TcpPacket::new(p).unwrap();
             if p.get_destination().to_string() == SRC_PORT.to_string() {
-                println!("from {}", p.get_source().to_string());
+                let status = match p.get_flags() as isize {
+                    OPEN_FLAG => "open",
+                    CLOSE_FLAG=> "closed",
+                    _ => "unknown"
+                };
+                println!("port {} is {}", p.get_source().to_string(), status);
             }
         },
         _ => {}
