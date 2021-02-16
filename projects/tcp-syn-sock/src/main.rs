@@ -6,9 +6,9 @@ use pnet::packet::ipv4::Ipv4Packet;
 use pnet::packet::tcp::{self, MutableTcpPacket, TcpFlags, TcpPacket};
 use pnet::packet::Packet;
 use pnet::transport::{self, TransportChannelType, TransportProtocol};
-use std::time::Duration;
 use std::net;
 use std::thread;
+use std::time::Duration;
 
 /// Usage:
 /// $ cargo build
@@ -38,18 +38,20 @@ fn main() {
 }
 
 fn rcv_packets_with_bpf() {
-    let interface = datalink::interfaces().into_iter().find(|iface| iface.name == NIF_NAME)
-    .expect("Failed to retrieve interface");
+    let interface = datalink::interfaces()
+        .into_iter()
+        .find(|iface| iface.name == NIF_NAME)
+        .expect("Failed to retrieve interface");
     let (_tx, mut rx) = match datalink::channel(&interface, Default::default()) {
         Ok(Ethernet(tx, rx)) => (tx, rx),
-        _ => panic!("Failed to create datalink channel")
+        _ => panic!("Failed to create datalink channel"),
     };
 
     loop {
         match rx.next() {
             Ok(frame) => {
                 retrieve_tcp_packet_from_ethernet(&EthernetPacket::new(frame).unwrap());
-            },
+            }
             Err(e) => {
                 eprintln!("Failed to read: {}", e);
             }
@@ -61,7 +63,7 @@ fn retrieve_tcp_packet_from_ethernet(p: &EthernetPacket) {
     match p.get_ethertype() {
         EtherTypes::Ipv4 => {
             retrieve_tcp_packet_from_ipv4(&Ipv4Packet::new(p.payload()).unwrap());
-        },
+        }
         _ => {}
     }
 }
@@ -74,12 +76,12 @@ fn retrieve_tcp_packet_from_ipv4(p: &Ipv4Packet) {
             if p.get_destination().to_string() == SRC_PORT.to_string() {
                 let status = match p.get_flags() as isize {
                     OPEN_FLAG => "open",
-                    CLOSE_FLAG=> "closed",
-                    _ => "unknown"
+                    CLOSE_FLAG => "closed",
+                    _ => "unknown",
                 };
                 println!("port {} is {}", p.get_source().to_string(), status);
             }
-        },
+        }
         _ => {}
     }
 }
@@ -110,10 +112,11 @@ fn send_raw_ip_datagram() {
     let checksum = tcp::ipv4_checksum(
         &tcp_header.to_immutable(),
         &"10.0.1.2".parse().expect("invalid ipaddr"),
-        &target_ipaddr
+        &target_ipaddr,
     );
     tcp_header.set_checksum(checksum);
-    let size = ts.send_to(tcp_header, net::IpAddr::V4(target_ipaddr))
+    let size = ts
+        .send_to(tcp_header, net::IpAddr::V4(target_ipaddr))
         .expect("failed to send a packet");
     println!("Port {} sent with size {}", DEST_PORT, size);
 }
