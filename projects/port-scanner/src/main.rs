@@ -1,9 +1,14 @@
 #[macro_use]
 extern crate log;
 extern crate rayon;
+use pnet::datalink;
+use pnet::datalink::Channel::Ethernet;
+use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
 use pnet::packet::ip::IpNextHeaderProtocols;
+use pnet::packet::ipv4::Ipv4Packet;
+use pnet::packet::Packet;
 use pnet::packet::tcp::{self, MutableTcpPacket, TcpFlags, TcpPacket};
-use pnet::transport::{self, TcpTransportChannelIterator, TransportChannelType, TransportProtocol};
+use pnet::transport::{self, TransportChannelType, TransportProtocol};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -13,14 +18,17 @@ use std::thread;
 use std::time;
 
 /// Usage:
-/// $ cargo run 127.0.0.1 sS
-/// $ sudo ./target/debug/port-scanner 127.0.0.1 sS
+/// $ cargo build
+/// $ sudo ./target/debug/port-scanner 10.0.1.1 sS
 
+const NIF_NAME: &str = "en0";
 const TCP_SIZE: usize = 20;
 const SYN_METHOD: &str = "sS";
 const FIN_METHOD: &str = "sF";
 const XMAX_METHOD: &str = "sX";
 const NULL_METHOD: &str = "sN";
+const OPEN_FLAG: isize = (TcpFlags::SYN as isize) | (TcpFlags::ACK as isize);
+const CLOSE_FLAG: isize = (TcpFlags::RST as isize) | (TcpFlags::ACK as isize);
 
 #[derive(Debug)]
 struct PacketInfo {
@@ -37,6 +45,16 @@ enum ScanType {
     FinScan = TcpFlags::FIN as isize,
     XmasScan = (TcpFlags::FIN | TcpFlags::URG | TcpFlags::PSH) as isize,
     NullScan = 0,
+}
+
+struct ScanedPacket {
+    dest_port: u16,
+    source_port: u16,
+    scan_result: ScanResult
+}
+#[derive(PartialEq, Debug)]
+enum ScanResult {
+    Open, Closed, Unknown
 }
 
 fn main() {
@@ -86,7 +104,7 @@ fn main() {
 
     println!("Packet info: {:?}", packet_info);
 
-    let (mut ts, mut tr) = transport::transport_channel(
+    let (mut ts, _tr) = transport::transport_channel(
         1024,
         TransportChannelType::Layer4(TransportProtocol::Ipv4(IpNextHeaderProtocols::Tcp)),
     )
@@ -94,7 +112,7 @@ fn main() {
 
     rayon::join(
         || send_packets(&mut ts, &packet_info),
-        || receive_packets(&mut tr, &packet_info)
+        || receive_packets(&packet_info)
     );
 }
 
@@ -103,25 +121,20 @@ fn send_packets(ts: &mut transport::TransportSender, packet_info: &PacketInfo) {
     for port in 1..packet_info.maximum_port {
         let mut tcp_header = tcp::MutableTcpPacket::new(&mut packet).unwrap();
         reregister_destination_port(port, &mut tcp_header, packet_info);
-        thread::sleep(time::Duration::from_millis(5));
-        ts.send_to(tcp_header, net::IpAddr::V4(packet_info.target_ipaddr))
+        thread::sleep(time::Duration::from_millis(10));
+        let _size = ts.send_to(tcp_header, net::IpAddr::V4(packet_info.target_ipaddr))
             .expect("failed to send a packet");
-        println!("Port {} sent", port);
+        //println!("Port {} sent with size {}", port, size);
     }
 }
 
-fn receive_packets(
-    tr: &mut transport::TransportReceiver,
-    packet_info: &PacketInfo,
-) {
-    let mut packet_iter = transport::tcp_packet_iter(tr);
-
+fn receive_packets(packet_info: &PacketInfo) {
     let res = match packet_info.scan_type {
         ScanType::SynScan => {
-            receive_syn_packets(&mut packet_iter, packet_info)
+            receive_syn_packets(packet_info)
         },
         ScanType::FinScan | ScanType::XmasScan | ScanType::NullScan => {
-            receive_replied_packets(&mut packet_iter, packet_info)
+            receive_replied_packets(packet_info)
         },
     };
 
@@ -130,47 +143,69 @@ fn receive_packets(
     }
 }
 
-fn receive_syn_packets(iter: &mut TcpTransportChannelIterator, packet_info: &PacketInfo) -> Vec<bool> {
+fn receive_syn_packets(packet_info: &PacketInfo) -> Vec<bool> {
     let mut scan_result = vec![false; (packet_info.maximum_port + 1) as usize];
-    let mut count = 0;
+
+    let interface = datalink::interfaces()
+        .into_iter()
+        .find(|iface| iface.name == NIF_NAME)
+        .expect("Failed to retrieve interface");
+    let (_tx, mut rx) = match datalink::channel(&interface, Default::default()) {
+        Ok(Ethernet(tx, rx)) => (tx, rx),
+        _ => panic!("Failed to create datalink channel"),
+    };
+
+    let mut count = 1;
     while count < packet_info.maximum_port {
-        let tcp_packet = match next_packet(iter, packet_info) {
-            Some(t) => t,
-            None => continue
-        };
+        match rx.next() {
+            Ok(frame) => {
+                let packet = retrieve_tcp_packet_from_ethernet(&EthernetPacket::new(frame).unwrap()).filter(|p| p.dest_port == packet_info.my_port);
+                if let Some(p) = packet {
+                    if p.source_port > packet_info.maximum_port {
+                        panic!("Unexpected target port: {}", p.source_port);
+                    }
 
-        let target_port = tcp_packet.get_source();
-        if target_port > packet_info.maximum_port {
-            panic!("Unexpected target port: {}", target_port);
+                    scan_result[p.source_port as usize] = p.scan_result == ScanResult::Open;
+                    println!("Port {} is {:?}", p.source_port, p.scan_result);
+                    count += 1;
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to read: {}", e);
+            }
         }
-
-        println!("Port {} received", target_port);
-        if tcp_packet.get_flags() == tcp::TcpFlags::SYN | tcp::TcpFlags::ACK {
-            scan_result[target_port as usize] = true;
-        }
-
-        count += 1;
     }
 
     scan_result
 }
 
-fn receive_replied_packets(iter: &mut TcpTransportChannelIterator, packet_info: &PacketInfo) -> Vec<bool> {
-    let mut scan_result = vec![false; (packet_info.maximum_port + 1) as usize];
+fn receive_replied_packets(packet_info: &PacketInfo) -> Vec<bool> {
+    let scan_result = vec![false; (packet_info.maximum_port + 1) as usize];
     scan_result
 }
 
-fn next_packet<'a>(iter: &'a mut TcpTransportChannelIterator, packet_info: &PacketInfo) -> Option<TcpPacket<'a>> {
-    println!("next_packet");
-    match iter.next() {
-        Ok((tcp_packet, _)) => {
-            if tcp_packet.get_destination() == packet_info.my_port {
-                Some(tcp_packet)
-            } else {
-                None
-            }
+fn retrieve_tcp_packet_from_ethernet(p: &EthernetPacket) -> Option<ScanedPacket> {
+    match p.get_ethertype() {
+        EtherTypes::Ipv4 => retrieve_tcp_packet_from_ipv4(&Ipv4Packet::new(p.payload()).unwrap()),
+        _ => None
+    }
+}
+
+fn retrieve_tcp_packet_from_ipv4(p: &Ipv4Packet) -> Option<ScanedPacket> {
+    match p.get_next_level_protocol() {
+        IpNextHeaderProtocols::Tcp => {
+            let p = p.payload();
+            let p = TcpPacket::new(p).unwrap();
+            let source_port = p.get_source() as u16;
+            let dest_port = p.get_destination() as u16;
+            let status = match p.get_flags() as isize {
+                OPEN_FLAG => ScanResult::Open,
+                CLOSE_FLAG => ScanResult::Closed,
+                _ => ScanResult::Unknown,
+            };
+            Some(ScanedPacket { source_port, dest_port, scan_result: status })
         }
-        Err(_) => None
+        _ => None
     }
 }
 
