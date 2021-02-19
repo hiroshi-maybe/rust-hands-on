@@ -3,6 +3,7 @@ extern crate log;
 extern crate rayon;
 use pnet::datalink;
 use pnet::datalink::Channel::Ethernet;
+use pnet::datalink::DataLinkReceiver;
 use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
 use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::packet::ipv4::Ipv4Packet;
@@ -27,8 +28,9 @@ const SYN_METHOD: &str = "sS";
 const FIN_METHOD: &str = "sF";
 const XMAX_METHOD: &str = "sX";
 const NULL_METHOD: &str = "sN";
-const OPEN_FLAG: isize = (TcpFlags::SYN as isize) | (TcpFlags::ACK as isize);
-const CLOSE_FLAG: isize = (TcpFlags::RST as isize) | (TcpFlags::ACK as isize);
+const SYNSCAN_OPEN_FLAG: isize = (TcpFlags::SYN as isize) | (TcpFlags::ACK as isize);
+const SYNSCAN_CLOSE_FLAG: isize = (TcpFlags::RST as isize) | (TcpFlags::ACK as isize);
+const FALLBACKSAN_CLOSE_FLAG: isize = TcpFlags::RST as isize;
 
 #[derive(Debug)]
 struct PacketInfo {
@@ -45,6 +47,30 @@ enum ScanType {
     FinScan = TcpFlags::FIN as isize,
     XmasScan = (TcpFlags::FIN | TcpFlags::URG | TcpFlags::PSH) as isize,
     NullScan = 0,
+}
+
+impl ScanType {
+    fn scan_result(self: &ScanType, tcp_flags: isize) -> ScanResult {
+        match self {
+            ScanType::SynScan => ScanType::syn_scan(tcp_flags),
+            _ => ScanType::scan_fallback(tcp_flags)
+        }
+    }
+
+    fn syn_scan(tcp_flags: isize) -> ScanResult {
+        match tcp_flags {
+            SYNSCAN_OPEN_FLAG => ScanResult::Open,
+            SYNSCAN_CLOSE_FLAG => ScanResult::Closed,
+            _ => ScanResult::Unknown,
+        }
+    }
+
+    fn scan_fallback(tcp_flags: isize) -> ScanResult {
+        match tcp_flags {
+            FALLBACKSAN_CLOSE_FLAG => ScanResult::Closed,
+            _ => ScanResult::Unknown,
+        }
+    }
 }
 
 struct ScanedPacket {
@@ -146,27 +172,20 @@ fn receive_packets(packet_info: &PacketInfo) {
 fn receive_syn_packets(packet_info: &PacketInfo) -> Vec<bool> {
     let mut scan_result = vec![false; (packet_info.maximum_port + 1) as usize];
 
-    let interface = datalink::interfaces()
-        .into_iter()
-        .find(|iface| iface.name == NIF_NAME)
-        .expect("Failed to retrieve interface");
-    let (_tx, mut rx) = match datalink::channel(&interface, Default::default()) {
-        Ok(Ethernet(tx, rx)) => (tx, rx),
-        _ => panic!("Failed to create datalink channel"),
-    };
+    let mut rx = create_datalink_receiver();
 
     let mut count = 1;
     while count < packet_info.maximum_port {
         match rx.next() {
             Ok(frame) => {
-                let packet = retrieve_tcp_packet_from_ethernet(&EthernetPacket::new(frame).unwrap()).filter(|p| p.dest_port == packet_info.my_port);
+                let packet = retrieve_tcp_packet_from_ethernet(&EthernetPacket::new(frame).unwrap(), packet_info).filter(|p| p.dest_port == packet_info.my_port);
                 if let Some(p) = packet {
                     if p.source_port > packet_info.maximum_port {
                         panic!("Unexpected target port: {}", p.source_port);
                     }
 
                     scan_result[p.source_port as usize] = p.scan_result == ScanResult::Open;
-                    println!("Port {} is {:?}", p.source_port, p.scan_result);
+                    //println!("Port {} is {:?}", p.source_port, p.scan_result);
                     count += 1;
                 }
             }
@@ -184,25 +203,34 @@ fn receive_replied_packets(packet_info: &PacketInfo) -> Vec<bool> {
     scan_result
 }
 
-fn retrieve_tcp_packet_from_ethernet(p: &EthernetPacket) -> Option<ScanedPacket> {
+fn create_datalink_receiver() -> Box<dyn DataLinkReceiver> {
+    let interface = datalink::interfaces()
+        .into_iter()
+        .find(|iface| iface.name == NIF_NAME)
+        .expect("Failed to retrieve interface");
+    let (_tx, rx) = match datalink::channel(&interface, Default::default()) {
+        Ok(Ethernet(tx, rx)) => (tx, rx),
+        _ => panic!("Failed to create datalink channel"),
+    };
+
+    rx
+}
+
+fn retrieve_tcp_packet_from_ethernet(p: &EthernetPacket, packet_info: &PacketInfo) -> Option<ScanedPacket> {
     match p.get_ethertype() {
-        EtherTypes::Ipv4 => retrieve_tcp_packet_from_ipv4(&Ipv4Packet::new(p.payload()).unwrap()),
+        EtherTypes::Ipv4 => retrieve_tcp_packet_from_ipv4(&Ipv4Packet::new(p.payload()).unwrap(), packet_info),
         _ => None
     }
 }
 
-fn retrieve_tcp_packet_from_ipv4(p: &Ipv4Packet) -> Option<ScanedPacket> {
+fn retrieve_tcp_packet_from_ipv4(p: &Ipv4Packet, packet_info: &PacketInfo) -> Option<ScanedPacket> {
     match p.get_next_level_protocol() {
         IpNextHeaderProtocols::Tcp => {
             let p = p.payload();
             let p = TcpPacket::new(p).unwrap();
             let source_port = p.get_source() as u16;
             let dest_port = p.get_destination() as u16;
-            let status = match p.get_flags() as isize {
-                OPEN_FLAG => ScanResult::Open,
-                CLOSE_FLAG => ScanResult::Closed,
-                _ => ScanResult::Unknown,
-            };
+            let status = packet_info.scan_type.scan_result(p.get_flags() as isize);
             Some(ScanedPacket { source_port, dest_port, scan_result: status })
         }
         _ => None
