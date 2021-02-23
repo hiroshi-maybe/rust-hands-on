@@ -3,6 +3,7 @@ extern crate log;
 extern crate rayon;
 use pnet::datalink;
 use pnet::datalink::Channel::Ethernet;
+use pnet::datalink::Config;
 use pnet::datalink::DataLinkReceiver;
 use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
 use pnet::packet::ip::IpNextHeaderProtocols;
@@ -208,7 +209,10 @@ fn create_datalink_receiver() -> Box<dyn DataLinkReceiver> {
         .into_iter()
         .find(|iface| iface.name == NIF_NAME)
         .expect("Failed to retrieve interface");
-    let (_tx, rx) = match datalink::channel(&interface, Default::default()) {
+
+    let mut config = Config::default();
+    config.read_timeout = Some(time::Duration::from_millis(10));
+    let (_tx, rx) = match datalink::channel(&interface, config) {
         Ok(Ethernet(tx, rx)) => (tx, rx),
         _ => panic!("Failed to create datalink channel"),
     };
