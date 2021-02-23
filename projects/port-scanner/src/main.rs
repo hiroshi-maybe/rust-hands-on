@@ -19,9 +19,13 @@ use std::process;
 use std::thread;
 use std::time;
 
+/// Non-SYN method does not work for my router.
+/// It always returns RST | ACK flag for non-SYN packet.
+///
 /// Usage:
 /// $ cargo build
 /// $ sudo ./target/debug/port-scanner 10.0.1.1 sS
+/// $ sudo ./target/debug/port-scanner 10.0.1.1 sF (does not work)
 
 const NIF_NAME: &str = "en0";
 const TCP_SIZE: usize = 20;
@@ -200,7 +204,32 @@ fn receive_syn_packets(packet_info: &PacketInfo) -> Vec<bool> {
 }
 
 fn receive_replied_packets(packet_info: &PacketInfo) -> Vec<bool> {
-    let scan_result = vec![false; (packet_info.maximum_port + 1) as usize];
+    let mut scan_result = vec![true; (packet_info.maximum_port + 1) as usize];
+
+    let mut rx = create_datalink_receiver();
+
+    let mut count = 1;
+    while count < packet_info.maximum_port {
+        match rx.next() {
+            Ok(frame) => {
+                let packet = retrieve_tcp_packet_from_ethernet(&EthernetPacket::new(frame).unwrap(), packet_info).filter(|p| p.dest_port == packet_info.my_port);
+                if let Some(p) = packet {
+                    if p.source_port > packet_info.maximum_port {
+                        panic!("Unexpected target port: {}", p.source_port);
+                    }
+
+                    scan_result[p.source_port as usize] = false;
+                    println!("Port {} is {:?}", p.source_port, p.scan_result);
+                    count += 1;
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to read: {}", e);
+                count += 1;
+            }
+        }
+    }
+
     scan_result
 }
 
