@@ -8,8 +8,8 @@ use pnet::datalink::DataLinkReceiver;
 use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
 use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::packet::ipv4::Ipv4Packet;
-use pnet::packet::Packet;
 use pnet::packet::tcp::{self, MutableTcpPacket, TcpFlags, TcpPacket};
+use pnet::packet::Packet;
 use pnet::transport::{self, TransportChannelType, TransportProtocol};
 use std::collections::HashMap;
 use std::env;
@@ -58,7 +58,7 @@ impl ScanType {
     fn scan_result(self: &ScanType, tcp_flags: isize) -> ScanResult {
         match self {
             ScanType::SynScan => ScanType::syn_scan(tcp_flags),
-            _ => ScanType::scan_fallback(tcp_flags)
+            _ => ScanType::scan_fallback(tcp_flags),
         }
     }
 
@@ -81,11 +81,13 @@ impl ScanType {
 struct ScanedPacket {
     dest_port: u16,
     source_port: u16,
-    scan_result: ScanResult
+    scan_result: ScanResult,
 }
 #[derive(PartialEq, Debug)]
 enum ScanResult {
-    Open, Closed, Unknown
+    Open,
+    Closed,
+    Unknown,
 }
 
 fn main() {
@@ -143,7 +145,7 @@ fn main() {
 
     rayon::join(
         || send_packets(&mut ts, &packet_info),
-        || receive_packets(&packet_info)
+        || receive_packets(&packet_info),
     );
 }
 
@@ -153,7 +155,8 @@ fn send_packets(ts: &mut transport::TransportSender, packet_info: &PacketInfo) {
         let mut tcp_header = tcp::MutableTcpPacket::new(&mut packet).unwrap();
         reregister_destination_port(port, &mut tcp_header, packet_info);
         thread::sleep(time::Duration::from_millis(10));
-        let _size = ts.send_to(tcp_header, net::IpAddr::V4(packet_info.target_ipaddr))
+        let _size = ts
+            .send_to(tcp_header, net::IpAddr::V4(packet_info.target_ipaddr))
             .expect("failed to send a packet");
         //println!("Port {} sent with size {}", port, size);
     }
@@ -161,16 +164,18 @@ fn send_packets(ts: &mut transport::TransportSender, packet_info: &PacketInfo) {
 
 fn receive_packets(packet_info: &PacketInfo) {
     let res = match packet_info.scan_type {
-        ScanType::SynScan => {
-            receive_syn_packets(packet_info)
-        },
+        ScanType::SynScan => receive_syn_packets(packet_info),
         ScanType::FinScan | ScanType::XmasScan | ScanType::NullScan => {
             receive_replied_packets(packet_info)
-        },
+        }
     };
 
     for port in 1..packet_info.maximum_port + 1 {
-        println!("Port {}: {}", port, if res[port as usize] { "✅" } else { "❌" });
+        println!(
+            "Port {}: {}",
+            port,
+            if res[port as usize] { "✅" } else { "❌" }
+        );
     }
 }
 
@@ -183,7 +188,11 @@ fn receive_syn_packets(packet_info: &PacketInfo) -> Vec<bool> {
     while count < packet_info.maximum_port {
         match rx.next() {
             Ok(frame) => {
-                let packet = retrieve_tcp_packet_from_ethernet(&EthernetPacket::new(frame).unwrap(), packet_info).filter(|p| p.dest_port == packet_info.my_port);
+                let packet = retrieve_tcp_packet_from_ethernet(
+                    &EthernetPacket::new(frame).unwrap(),
+                    packet_info,
+                )
+                .filter(|p| p.dest_port == packet_info.my_port);
                 if let Some(p) = packet {
                     if p.source_port > packet_info.maximum_port {
                         panic!("Unexpected target port: {}", p.source_port);
@@ -212,7 +221,11 @@ fn receive_replied_packets(packet_info: &PacketInfo) -> Vec<bool> {
     while count < packet_info.maximum_port {
         match rx.next() {
             Ok(frame) => {
-                let packet = retrieve_tcp_packet_from_ethernet(&EthernetPacket::new(frame).unwrap(), packet_info).filter(|p| p.dest_port == packet_info.my_port);
+                let packet = retrieve_tcp_packet_from_ethernet(
+                    &EthernetPacket::new(frame).unwrap(),
+                    packet_info,
+                )
+                .filter(|p| p.dest_port == packet_info.my_port);
                 if let Some(p) = packet {
                     if p.source_port > packet_info.maximum_port {
                         panic!("Unexpected target port: {}", p.source_port);
@@ -249,10 +262,15 @@ fn create_datalink_receiver() -> Box<dyn DataLinkReceiver> {
     rx
 }
 
-fn retrieve_tcp_packet_from_ethernet(p: &EthernetPacket, packet_info: &PacketInfo) -> Option<ScanedPacket> {
+fn retrieve_tcp_packet_from_ethernet(
+    p: &EthernetPacket,
+    packet_info: &PacketInfo,
+) -> Option<ScanedPacket> {
     match p.get_ethertype() {
-        EtherTypes::Ipv4 => retrieve_tcp_packet_from_ipv4(&Ipv4Packet::new(p.payload()).unwrap(), packet_info),
-        _ => None
+        EtherTypes::Ipv4 => {
+            retrieve_tcp_packet_from_ipv4(&Ipv4Packet::new(p.payload()).unwrap(), packet_info)
+        }
+        _ => None,
     }
 }
 
@@ -264,9 +282,13 @@ fn retrieve_tcp_packet_from_ipv4(p: &Ipv4Packet, packet_info: &PacketInfo) -> Op
             let source_port = p.get_source() as u16;
             let dest_port = p.get_destination() as u16;
             let status = packet_info.scan_type.scan_result(p.get_flags() as isize);
-            Some(ScanedPacket { source_port, dest_port, scan_result: status })
+            Some(ScanedPacket {
+                source_port,
+                dest_port,
+                scan_result: status,
+            })
         }
-        _ => None
+        _ => None,
     }
 }
 
