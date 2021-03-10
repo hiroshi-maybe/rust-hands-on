@@ -1,5 +1,8 @@
 use mio::tcp::{TcpListener, TcpStream};
+use mio::{Events, Poll, PollOpt, Ready, Token};
 use std::collections::HashMap;
+
+const SERVER: Token = Token(0);
 
 struct WebServer {
     listening_socket: TcpListener,
@@ -16,6 +19,22 @@ impl WebServer {
             connections: HashMap::new(),
             next_connection_id: 1,
         })
+    }
+
+    fn run(&mut self) -> Result<(), failure::Error> {
+        let poll = Poll::new()?;
+
+        poll.register(
+            &self.listening_socket,
+            SERVER,
+            Ready::readable(),
+            PollOpt::level(),
+        )?;
+
+        let mut events = Events::with_capacity(1024);
+        let mut response = Vec::new();
+
+        Ok(())
     }
 }
 
