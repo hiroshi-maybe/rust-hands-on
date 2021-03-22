@@ -1,6 +1,8 @@
 use mio::tcp::{TcpListener, TcpStream};
-use mio::{Events, Poll, PollOpt, Ready, Token};
+use mio::{Event, Events, Poll, PollOpt, Ready, Token};
 use std::collections::HashMap;
+#[macro_use]
+extern crate log;
 
 const SERVER: Token = Token(0);
 
@@ -34,6 +36,46 @@ impl WebServer {
         let mut events = Events::with_capacity(1024);
         let mut response = Vec::new();
 
+        loop {
+            match poll.poll(&mut events, None) {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("{}", e);
+                    continue;
+                }
+            }
+
+            for event in &events {
+                match event.token() {
+                    SERVER => {
+                        let (stream, remote) = match self.listening_socket.accept() {
+                            Ok(t) => t,
+                            Err(e) => {
+                                error!("{}", e);
+                                continue;
+                            }
+                        };
+                        debug!("Connection from {}", &remote);
+                        self.register_connection(&poll, stream)
+                            .unwrap_or_else(|e| error!("{}", e));
+                    }
+
+                    Token(conn_id) => {
+                        self.http_handler(conn_id, event, &poll, &mut response)
+                            .unwrap_or_else(|e| error!("{}", e));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn register_connection(&mut self, poll: &Poll, stream: TcpStream) -> Result<(), failure::Error> {
+        Ok(())
+    }
+
+    fn http_handler(&mut self, conn_id: usize, event: Event, poll: &Poll, response: &mut Vec<u8>) -> Result<(), failure::Error> {
         Ok(())
     }
 }
