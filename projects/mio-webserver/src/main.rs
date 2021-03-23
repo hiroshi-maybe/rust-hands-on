@@ -72,6 +72,13 @@ impl WebServer {
     }
 
     fn register_connection(&mut self, poll: &Poll, stream: TcpStream) -> Result<(), failure::Error> {
+        let token = Token(self.next_connection_id);
+        poll.register(&stream, token, Ready::readable(), PollOpt::edge())?;
+
+        if self.connections.insert(self.next_connection_id, stream).is_some() {
+            error!("Connection ID is already in use");
+        }
+        self.next_connection_id += 1;
         Ok(())
     }
 
