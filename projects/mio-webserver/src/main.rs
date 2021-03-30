@@ -1,6 +1,7 @@
 use mio::tcp::{TcpListener, TcpStream};
 use mio::{Event, Events, Poll, PollOpt, Ready, Token};
 use std::collections::HashMap;
+use std::io::{Read, Write};
 #[macro_use]
 extern crate log;
 
@@ -83,8 +84,49 @@ impl WebServer {
     }
 
     fn http_handler(&mut self, conn_id: usize, event: Event, poll: &Poll, response: &mut Vec<u8>) -> Result<(), failure::Error> {
+        if event.readiness().is_readable() {
+            self.read_from_socket(conn_id, poll, response);
+            Ok(())
+        } else if event.readiness().is_writable() {
+            self.write_to_socket(conn_id, response);
+            Ok(())
+        } else {
+            Err(failure::err_msg("Undefined event."))
+        }
+    }
+
+    fn read_from_socket(&mut self, conn_id: usize, poll: &Poll, response: &mut Vec<u8>) -> Result<(), failure::Error> {
+        debug!("readable conn_id: {}", conn_id);
+        let mut buffer = [0u8; 1024];
+        let stream = self.get_stream(conn_id)?;
+        let nbytes = stream.read(&mut buffer)?;
+        if nbytes != 0 {
+            *response = make_response(&buffer[..nbytes])?;
+            poll.reregister(stream, Token(conn_id), Ready::writable(), PollOpt::edge())?;
+        } else {
+            self.connections.remove(&conn_id);
+        }
+
         Ok(())
     }
+
+    fn write_to_socket(&mut self, conn_id: usize, response: &mut Vec<u8>) -> Result<(), failure::Error> {
+        debug!("writable conn_id: {}", conn_id);
+        let stream = self.get_stream(conn_id)?;
+        stream.write_all(response)?;
+        self.connections.remove(&conn_id);
+        Ok(())
+    }
+
+    fn get_stream(&mut self, conn_id: usize) -> Result<&mut TcpStream, failure::Error> {
+        self.connections
+            .get_mut(&conn_id)
+            .ok_or_else(|| failure::err_msg("Failed to get connection."))
+    }
+}
+
+fn make_response(_buffer: &[u8]) -> Result<Vec<u8>, failure::Error> {
+    Ok(vec![])
 }
 
 fn main() {
