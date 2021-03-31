@@ -72,18 +72,32 @@ impl WebServer {
         Ok(())
     }
 
-    fn register_connection(&mut self, poll: &Poll, stream: TcpStream) -> Result<(), failure::Error> {
+    fn register_connection(
+        &mut self,
+        poll: &Poll,
+        stream: TcpStream,
+    ) -> Result<(), failure::Error> {
         let token = Token(self.next_connection_id);
         poll.register(&stream, token, Ready::readable(), PollOpt::edge())?;
 
-        if self.connections.insert(self.next_connection_id, stream).is_some() {
+        if self
+            .connections
+            .insert(self.next_connection_id, stream)
+            .is_some()
+        {
             error!("Connection ID is already in use");
         }
         self.next_connection_id += 1;
         Ok(())
     }
 
-    fn http_handler(&mut self, conn_id: usize, event: Event, poll: &Poll, response: &mut Vec<u8>) -> Result<(), failure::Error> {
+    fn http_handler(
+        &mut self,
+        conn_id: usize,
+        event: Event,
+        poll: &Poll,
+        response: &mut Vec<u8>,
+    ) -> Result<(), failure::Error> {
         if event.readiness().is_readable() {
             self.read_from_socket(conn_id, poll, response);
             Ok(())
@@ -95,7 +109,12 @@ impl WebServer {
         }
     }
 
-    fn read_from_socket(&mut self, conn_id: usize, poll: &Poll, response: &mut Vec<u8>) -> Result<(), failure::Error> {
+    fn read_from_socket(
+        &mut self,
+        conn_id: usize,
+        poll: &Poll,
+        response: &mut Vec<u8>,
+    ) -> Result<(), failure::Error> {
         debug!("readable conn_id: {}", conn_id);
         let mut buffer = [0u8; 1024];
         let stream = self.get_stream(conn_id)?;
@@ -110,7 +129,11 @@ impl WebServer {
         Ok(())
     }
 
-    fn write_to_socket(&mut self, conn_id: usize, response: &mut Vec<u8>) -> Result<(), failure::Error> {
+    fn write_to_socket(
+        &mut self,
+        conn_id: usize,
+        response: &mut Vec<u8>,
+    ) -> Result<(), failure::Error> {
         debug!("writable conn_id: {}", conn_id);
         let stream = self.get_stream(conn_id)?;
         stream.write_all(response)?;
