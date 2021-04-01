@@ -208,4 +208,20 @@ fn create_res_msg(msg: &str) -> Vec<u8> {
              .into_bytes()
 }
 
-fn main() {}
+fn main() {
+    env::set_var("RUST_LOG", "debug");
+    env_logger::init();
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        error!("wrong number of arguments.");
+        process::exit(1);
+    }
+    let mut server = WebServer::new(&args[1]).unwrap_or_else(|e| {
+        error!("{}", e);
+        panic!();
+    });
+    server.run().unwrap_or_else(|e| {
+        error!("{}", e);
+        panic!();
+    });
+}
