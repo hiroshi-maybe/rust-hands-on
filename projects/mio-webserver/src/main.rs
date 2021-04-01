@@ -2,7 +2,7 @@ use mio::tcp::{TcpListener, TcpStream};
 use mio::{Event, Events, Poll, PollOpt, Ready, Token};
 use regex::Regex;
 use std::collections::HashMap;
-use std::env;
+use std::{env, process, str};
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 #[macro_use]
@@ -72,8 +72,6 @@ impl WebServer {
                 }
             }
         }
-
-        Ok(())
     }
 
     fn register_connection(
@@ -103,11 +101,9 @@ impl WebServer {
         response: &mut Vec<u8>,
     ) -> Result<(), failure::Error> {
         if event.readiness().is_readable() {
-            self.read_from_socket(conn_id, poll, response);
-            Ok(())
+            self.read_from_socket(conn_id, poll, response)
         } else if event.readiness().is_writable() {
-            self.write_to_socket(conn_id, response);
-            Ok(())
+            self.write_to_socket(conn_id, response)
         } else {
             Err(failure::err_msg("Undefined event."))
         }
@@ -152,7 +148,7 @@ impl WebServer {
     }
 }
 
-fn make_response(_buffer: &[u8]) -> Result<Vec<u8>, failure::Error> {
+fn make_response(buffer: &[u8]) -> Result<Vec<u8>, failure::Error> {
     let http_pattern = Regex::new(r"(.*) (.*) HTTP/1.([0-1])\r\n.*")?;
     let captures = match http_pattern.captures(str::from_utf8(buffer)?) {
         Some(cap) => cap,
@@ -195,7 +191,8 @@ fn create_msg_from_code(status_code: u16, msg: Option<Vec<u8>>) -> Result<Vec<u8
     match status_code {
         200 => {
             let header = create_res_msg(OK_200);
-            Ok(msg.map_or_else(|| header, |body| [&header[..], &body[..]].concat()))
+            let body = msg.unwrap_or_default();
+            Ok([&header[..], &body[..]].concat())
         },
         400 => Ok(create_res_msg(ERROR_400)),
         404 => Ok(create_res_msg(ERROR_404)),
@@ -211,6 +208,4 @@ fn create_res_msg(msg: &str) -> Vec<u8> {
              .into_bytes()
 }
 
-fn main() {
-    println!("Hello, world!");
-}
+fn main() {}
