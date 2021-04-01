@@ -158,12 +158,17 @@ fn make_response(buffer: &[u8]) -> Result<Vec<u8>, failure::Error> {
     };
 
     let method = captures[1].to_string();
-    let path = format!(
+    let mut path = format!(
         "{}{}{}",
         env::current_dir()?.display(),
         WEBROOT,
         &captures[2]
     );
+    if path.ends_with("/") {
+        path.push_str("index.html");
+    }
+
+    debug!("retrieving path: {}", path);
     let _version = captures[3].to_string();
 
     if method != "GET" {
