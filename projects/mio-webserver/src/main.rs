@@ -2,9 +2,9 @@ use mio::tcp::{TcpListener, TcpStream};
 use mio::{Event, Events, Poll, PollOpt, Ready, Token};
 use regex::Regex;
 use std::collections::HashMap;
-use std::{env, process, str};
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
+use std::{env, process, str};
 #[macro_use]
 extern crate log;
 
@@ -198,19 +198,22 @@ fn create_msg_from_code(status_code: u16, msg: Option<Vec<u8>>) -> Result<Vec<u8
             let header = create_res_msg(OK_200);
             let body = msg.unwrap_or_default();
             Ok([&header[..], &body[..]].concat())
-        },
+        }
         400 => Ok(create_res_msg(ERROR_400)),
         404 => Ok(create_res_msg(ERROR_404)),
         501 => Ok(create_res_msg(ERROR_501)),
-        _ => Err(failure::err_msg("Unexpected status code."))
+        _ => Err(failure::err_msg("Unexpected status code.")),
     }
 }
 
 fn create_res_msg(msg: &str) -> Vec<u8> {
-    format!("HTTP/1.0 {}\r\n\
-             Server: mio webserver\r\n\r\n", msg)
-             .to_string()
-             .into_bytes()
+    format!(
+        "HTTP/1.0 {}\r\n\
+             Server: mio webserver\r\n\r\n",
+        msg
+    )
+    .to_string()
+    .into_bytes()
 }
 
 fn main() {
