@@ -1,6 +1,12 @@
-use std::{net::Ipv4Addr, ops::Range};
+use std::{collections::HashMap, net::Ipv4Addr, ops::Range, sync::{Mutex, RwLock}};
 
+use ipnetwork::Ipv4Network;
+use log::info;
 use pnet::{packet::PrimitiveValues, util::MacAddr};
+use rusqlite::Connection;
+
+use super::database;
+use super::util;
 
 const OP: usize = 0;
 const HTYPE: usize = 1;
@@ -134,6 +140,9 @@ fn find_field_range(field: usize) -> Range<usize> {
 }
 
 pub struct DhcpServer {
+    address_pool: RwLock<Vec<Ipv4Addr>>,
+    pub db_connection: Mutex<Connection>,
+    pub network_addr: Ipv4Network,
     pub server_address: Ipv4Addr,
     pub default_gateway: Ipv4Addr,
     pub subnet_mask: Ipv4Addr,
@@ -143,13 +152,61 @@ pub struct DhcpServer {
 
 impl DhcpServer {
     pub fn new() -> Result<DhcpServer, failure::Error> {
+        let env = util::load_env();
+        let static_addresses = util::obtain_static_addresses(&env)?;
+
+        let subnet_mask = static_addresses[util::SUBNET_MASK_KEY];
+        let network_addr_with_prefix: Ipv4Network = Ipv4Network::new(static_addresses[util::NETWORK_ADDR_KEY], ipnetwork::ipv4_mask_to_prefix(subnet_mask)?)?;
+
+        let con = Connection::open("dhcp.db")?;
+        let addr_pool = Self::init_address_pool(&con, &static_addresses, network_addr_with_prefix)?;
+
+        info!("Ther are {} addresses in the address pool", addr_pool.len());
+        let raw_lease_time: u32 = util::get_and_parse_addr(util::LEASE_TIME_KEY, &env)?;
+        let lease_time = util::make_big_endian_vec_from_u32(raw_lease_time)?;
+
         let dummyAddr = Ipv4Addr::new(127, 0, 0, 1);
         Ok(DhcpServer {
-            server_address: dummyAddr,
-            default_gateway: dummyAddr,
-            subnet_mask: dummyAddr,
-            dns_server: dummyAddr,
-            lease_time: Vec::new(),
+            address_pool: RwLock::new(addr_pool),
+            db_connection: Mutex::new(con),
+            network_addr: network_addr_with_prefix,
+            server_address: static_addresses[util::SERVER_IDENTIFIER_KEY],
+            default_gateway: static_addresses[util::DEFAULT_GATEWAY_KEY],
+            subnet_mask: static_addresses[util::SUBNET_MASK_KEY],
+            dns_server: static_addresses[util::DNS_SERVER_KEY],
+            lease_time,
         })
+    }
+
+    pub fn pick_available_ip(&self) -> Option<Ipv4Addr> {
+        let mut lock = self.address_pool.write().unwrap();
+        lock.pop()
+    }
+
+    pub fn pick_specified_ip(&self, requesetd_ip: Ipv4Addr) -> Option<Ipv4Addr> {
+        let mut lock = self.address_pool.write().unwrap();
+        lock.iter()
+            .position(|&a| a == requesetd_ip)
+            .map(|i| lock.remove(i))
+    }
+
+    pub fn release_address(&self, release_ip: Ipv4Addr) {
+        let mut lock = self.address_pool.write().unwrap();
+        lock.insert(0, release_ip);
+    }
+
+    fn init_address_pool(con: &Connection, static_addresses: &HashMap<String, Ipv4Addr>, network_addr_with_prefix: Ipv4Network,) -> Result<Vec<Ipv4Addr>, failure::Error> {
+        let network_addr = static_addresses.get(util::NETWORK_ADDR_KEY).unwrap();
+        let default_gateway = static_addresses.get(util::DEFAULT_GATEWAY_KEY).unwrap();
+        let dhcp_server_addr = static_addresses.get(util::SERVER_IDENTIFIER_KEY).unwrap();
+        let dns_server_addr = static_addresses.get(util::DNS_SERVER_KEY).unwrap();
+        let broadcast = network_addr_with_prefix.broadcast();
+
+        let mut used_ip_addrs = database::select_addresses(con, Some(0))?;
+        used_ip_addrs.extend(vec![*network_addr, *default_gateway, *dhcp_server_addr, *dns_server_addr, broadcast]);
+        let mut addr_pool: Vec<Ipv4Addr> = network_addr_with_prefix.iter().filter(|addr| !used_ip_addrs.contains(addr)).collect::<Vec<_>>();
+        addr_pool.reverse();
+
+        Ok(addr_pool)
     }
 }

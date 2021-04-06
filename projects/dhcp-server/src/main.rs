@@ -7,7 +7,9 @@ use std::{
 
 use dhcp::{DhcpPacket, DhcpServer};
 use log::{debug, error};
+mod database;
 mod dhcp;
+mod util;
 
 const DHCP_SIZE: usize = 400;
 
