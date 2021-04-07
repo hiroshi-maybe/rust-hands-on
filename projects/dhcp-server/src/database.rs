@@ -1,8 +1,11 @@
 use std::net::Ipv4Addr;
 
-use rusqlite::{Connection, NO_PARAMS, Rows, params};
+use rusqlite::{params, Connection, Rows, NO_PARAMS};
 
-pub fn select_addresses(con: &Connection, deleted: Option<u8>) -> Result<Vec<Ipv4Addr>, failure::Error> {
+pub fn select_addresses(
+    con: &Connection,
+    deleted: Option<u8>,
+) -> Result<Vec<Ipv4Addr>, failure::Error> {
     if let Some(deleted) = deleted {
         let mut statement = con.prepare("SELECT ip_addr FROM lease_entries WHERE deleted = ?")?;
         let ip_addrs = statement.query(params![deleted.to_string()])?;
@@ -21,7 +24,7 @@ fn get_addresses_from_row(mut ip_addrs: Rows) -> Result<Vec<Ipv4Addr>, failure::
             Ok(ip) => {
                 let ip: String = ip;
                 ip.parse()?
-            },
+            }
             Err(_) => continue,
         };
         leased_addrs.push(ip_addr);

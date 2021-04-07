@@ -1,4 +1,9 @@
-use std::{collections::HashMap, net::Ipv4Addr, ops::Range, sync::{Mutex, RwLock}};
+use std::{
+    collections::HashMap,
+    net::Ipv4Addr,
+    ops::Range,
+    sync::{Mutex, RwLock},
+};
 
 use ipnetwork::Ipv4Network;
 use log::info;
@@ -181,7 +186,10 @@ impl DhcpServer {
         let static_addresses = util::obtain_static_addresses(&env)?;
 
         let subnet_mask = static_addresses[util::SUBNET_MASK_KEY];
-        let network_addr_with_prefix: Ipv4Network = Ipv4Network::new(static_addresses[util::NETWORK_ADDR_KEY], ipnetwork::ipv4_mask_to_prefix(subnet_mask)?)?;
+        let network_addr_with_prefix: Ipv4Network = Ipv4Network::new(
+            static_addresses[util::NETWORK_ADDR_KEY],
+            ipnetwork::ipv4_mask_to_prefix(subnet_mask)?,
+        )?;
 
         let con = Connection::open("dhcp.db")?;
         let addr_pool = Self::init_address_pool(&con, &static_addresses, network_addr_with_prefix)?;
@@ -220,7 +228,11 @@ impl DhcpServer {
         lock.insert(0, release_ip);
     }
 
-    fn init_address_pool(con: &Connection, static_addresses: &HashMap<String, Ipv4Addr>, network_addr_with_prefix: Ipv4Network,) -> Result<Vec<Ipv4Addr>, failure::Error> {
+    fn init_address_pool(
+        con: &Connection,
+        static_addresses: &HashMap<String, Ipv4Addr>,
+        network_addr_with_prefix: Ipv4Network,
+    ) -> Result<Vec<Ipv4Addr>, failure::Error> {
         let network_addr = static_addresses.get(util::NETWORK_ADDR_KEY).unwrap();
         let default_gateway = static_addresses.get(util::DEFAULT_GATEWAY_KEY).unwrap();
         let dhcp_server_addr = static_addresses.get(util::SERVER_IDENTIFIER_KEY).unwrap();
@@ -228,8 +240,17 @@ impl DhcpServer {
         let broadcast = network_addr_with_prefix.broadcast();
 
         let mut used_ip_addrs = database::select_addresses(con, Some(0))?;
-        used_ip_addrs.extend(vec![*network_addr, *default_gateway, *dhcp_server_addr, *dns_server_addr, broadcast]);
-        let mut addr_pool: Vec<Ipv4Addr> = network_addr_with_prefix.iter().filter(|addr| !used_ip_addrs.contains(addr)).collect::<Vec<_>>();
+        used_ip_addrs.extend(vec![
+            *network_addr,
+            *default_gateway,
+            *dhcp_server_addr,
+            *dns_server_addr,
+            broadcast,
+        ]);
+        let mut addr_pool: Vec<Ipv4Addr> = network_addr_with_prefix
+            .iter()
+            .filter(|addr| !used_ip_addrs.contains(addr))
+            .collect::<Vec<_>>();
         addr_pool.reverse();
 
         Ok(addr_pool)

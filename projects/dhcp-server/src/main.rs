@@ -95,30 +95,69 @@ fn dhcp_handler(
     match message_type {
         DHCPDISCOVER => dhcp_discover_message_handler(tx_id, dhcp_server, packet, soc),
         DHCPREQUEST => match packet.get_option(Code::ServerIdentifier as u8) {
-            Some(server_id) => dhcp_request_message_handler_responded_to_offer(tx_id, dhcp_server, packet, client_macaddr, soc, server_id),
-            None => dhcp_request_message_handler_to_reallocate(tx_id, dhcp_server, packet, client_macaddr, soc),
+            Some(server_id) => dhcp_request_message_handler_responded_to_offer(
+                tx_id,
+                dhcp_server,
+                packet,
+                client_macaddr,
+                soc,
+                server_id,
+            ),
+            None => dhcp_request_message_handler_to_reallocate(
+                tx_id,
+                dhcp_server,
+                packet,
+                client_macaddr,
+                soc,
+            ),
         },
         DHCPRELEASE => dhcp_release_message_handler(tx_id, dhcp_server, packet, client_macaddr),
         _ => {
-            let msg = format!("{:x}: received unimplemented message, message_type: {}", tx_id, message_type);
+            let msg = format!(
+                "{:x}: received unimplemented message, message_type: {}",
+                tx_id, message_type
+            );
             Err(failure::err_msg(msg))
         }
     }
 }
 
-fn dhcp_discover_message_handler(tx_id: u32, dhcp_server: Arc<DhcpServer>, packet: &DhcpPacket, soc: &UdpSocket) -> Result<(), failure::Error> {
+fn dhcp_discover_message_handler(
+    tx_id: u32,
+    dhcp_server: Arc<DhcpServer>,
+    packet: &DhcpPacket,
+    soc: &UdpSocket,
+) -> Result<(), failure::Error> {
     Ok(())
 }
 
-fn dhcp_request_message_handler_responded_to_offer(tx_id: u32, dhcp_server: Arc<DhcpServer>, packet: &DhcpPacket, client_macaddr: MacAddr, soc: &UdpSocket, server_id: Vec<u8>) -> Result<(), failure::Error> {
+fn dhcp_request_message_handler_responded_to_offer(
+    tx_id: u32,
+    dhcp_server: Arc<DhcpServer>,
+    packet: &DhcpPacket,
+    client_macaddr: MacAddr,
+    soc: &UdpSocket,
+    server_id: Vec<u8>,
+) -> Result<(), failure::Error> {
     Ok(())
 }
 
-fn dhcp_request_message_handler_to_reallocate(tx_id: u32, dhcp_server: Arc<DhcpServer>, packet: &DhcpPacket, client_macaddr: MacAddr, soc: &UdpSocket) -> Result<(), failure::Error> {
+fn dhcp_request_message_handler_to_reallocate(
+    tx_id: u32,
+    dhcp_server: Arc<DhcpServer>,
+    packet: &DhcpPacket,
+    client_macaddr: MacAddr,
+    soc: &UdpSocket,
+) -> Result<(), failure::Error> {
     Ok(())
 }
 
-fn dhcp_release_message_handler(tx_id: u32, dhcp_server: Arc<DhcpServer>, packet: &DhcpPacket, client_macaddr: MacAddr) -> Result<(), failure::Error> {
+fn dhcp_release_message_handler(
+    tx_id: u32,
+    dhcp_server: Arc<DhcpServer>,
+    packet: &DhcpPacket,
+    client_macaddr: MacAddr,
+) -> Result<(), failure::Error> {
     Ok(())
 }
 
