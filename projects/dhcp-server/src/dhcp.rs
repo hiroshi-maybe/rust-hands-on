@@ -129,6 +129,31 @@ impl DhcpPacket {
         let b = &self.buffer[find_field_range(CHADDR)];
         MacAddr::new(b[0], b[1], b[2], b[3], b[4], b[5])
     }
+
+    pub fn get_option(&self, option_code: u8) -> Option<Vec<u8>> {
+        let mut i: usize = 4; /* cookie size */
+        let options = self.get_options();
+        while options[i] != OPTION_END {
+            if options[i] == option_code {
+                let len = options[i + 1];
+                let buf_index = i + 2;
+                return Some(options[buf_index..buf_index + len as usize].to_vec());
+            } else if options[i] == 0 {
+                // padding
+                i += 1;
+            } else {
+                i += 1;
+                let len = options[i];
+                i += 1;
+                i += len as usize;
+            }
+        }
+        None
+    }
+
+    fn get_options(&self) -> &[u8] {
+        &self.buffer[OPTIONS..]
+    }
 }
 
 fn find_field_range(field: usize) -> Range<usize> {
