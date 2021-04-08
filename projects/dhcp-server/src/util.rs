@@ -1,11 +1,8 @@
-use std::{
-    collections::HashMap,
-    fs, io,
-    net::{AddrParseError, Ipv4Addr, SocketAddr},
-    str::FromStr,
-};
+use std::{collections::HashMap, fs, io, net::{AddrParseError, IpAddr, Ipv4Addr}, str::FromStr, sync::mpsc, thread, time::Duration};
 
 use byteorder::{BigEndian, WriteBytesExt};
+use log::{debug, info};
+use pnet::{packet::{Packet, icmp::{IcmpTypes, echo_request::{EchoRequestPacket, MutableEchoRequestPacket}}, ip::IpNextHeaderProtocols}, transport::{self, TransportChannelType, icmp_packet_iter, TransportProtocol::Ipv4}, util::checksum};
 
 pub const NETWORK_ADDR_KEY: &str = "NETWORK_ADDR";
 pub const SUBNET_MASK_KEY: &str = "SUBNET_MASK";
@@ -69,4 +66,54 @@ pub fn make_big_endian_vec_from_u32(i: u32) -> Result<Vec<u8>, io::Error> {
     let mut v = Vec::new();
     v.write_u32::<BigEndian>(i)?;
     Ok(v)
+}
+
+pub fn is_ipaddr_available(target_ip: Ipv4Addr) -> Result<(), failure::Error> {
+    let icmp_buf = create_default_icmp_buffer();
+    let icmp_packet = EchoRequestPacket::new(&icmp_buf).unwrap();
+
+    let (mut transport_sender, mut transport_receiver) = transport::transport_channel(1024, TransportChannelType::Layer4(Ipv4(IpNextHeaderProtocols::Icmp)),
+    )?;
+    transport_sender.send_to(icmp_packet, IpAddr::V4(target_ip))?;
+
+    let (sender, receiver) = mpsc::channel();
+
+    thread::spawn(move || {
+        let mut iter = icmp_packet_iter(&mut transport_receiver);
+        let (packet, _) = iter.next().unwrap();
+        if packet.get_icmp_type() == IcmpTypes::EchoReply {
+            match sender.send(true) {
+                Err(_) => {
+                    info!("icmp timeout");
+                }
+                _ => {
+                    return;
+                }
+            }
+        }
+    });
+
+    if receiver.recv_timeout(Duration::from_millis(200)).is_ok() {
+        Err(failure::format_err!("Ip addr already in use: {}", target_ip))
+    } else {
+        debug!("not received reply within timeout");
+        Ok(())
+    }
+}
+
+fn create_default_icmp_buffer() -> [u8; 8] {
+    let mut buffer = [0u8; 8];
+    let mut icmp_packet = MutableEchoRequestPacket::new(&mut buffer).unwrap();
+    icmp_packet.set_icmp_type(IcmpTypes::EchoRequest);
+    let checksum = checksum(icmp_packet.to_immutable().packet(), 16);
+    icmp_packet.set_checksum(checksum);
+    buffer
+}
+
+pub fn u8_to_ipv4addr(buf: &[u8]) -> Option<Ipv4Addr> {
+    if buf.len() == 4 {
+        Some(Ipv4Addr::new(buf[0], buf[1], buf[2], buf[3]))
+    } else {
+        None
+    }
 }

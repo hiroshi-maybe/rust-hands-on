@@ -7,7 +7,7 @@ use std::{
 
 use byteorder::{BigEndian, ByteOrder};
 use dhcp::{DhcpPacket, DhcpServer};
-use log::{debug, error};
+use log::{debug, error, info};
 use pnet::util::MacAddr;
 mod database;
 mod dhcp;
@@ -125,10 +125,50 @@ fn dhcp_handler(
 fn dhcp_discover_message_handler(
     tx_id: u32,
     dhcp_server: Arc<DhcpServer>,
-    packet: &DhcpPacket,
+    received_packet: &DhcpPacket,
     soc: &UdpSocket,
 ) -> Result<(), failure::Error> {
+    info!("{:x}: received DHCPDISCOVER", tx_id);
+
+    let ip_to_be_leased = select_lease_ip(&dhcp_server, &received_packet)?;
     Ok(())
+}
+
+fn select_lease_ip(
+    dhcp_server: &Arc<DhcpServer>,
+    received_packet: &DhcpPacket,
+) -> Result<Ipv4Addr, failure::Error> {
+    let con = dhcp_server.db_connection.lock().unwrap();
+    if let Some(ip_from_used) = database::select_entry(&con, received_packet.get_chaddr())? {
+        if dhcp_server.network_addr.contains(ip_from_used) && util::is_ipaddr_available(ip_from_used).is_ok() {
+            return Ok(ip_from_used);
+        }
+    }
+
+    if let Some(ip_to_be_leased) = obtain_available_ip_from_requested_option(dhcp_server, &received_packet) {
+        return Ok(ip_to_be_leased);
+    }
+
+    while let Some(ip_addr) = dhcp_server.pick_available_ip() {
+        if util::is_ipaddr_available(ip_addr).is_ok() {
+            return Ok(ip_addr);
+        }
+    }
+    Err(failure::err_msg("Could not obtain available ip address."))
+}
+
+fn obtain_available_ip_from_requested_option(
+    dhcp_server: &Arc<DhcpServer>,
+    received_packet: &DhcpPacket,
+) -> Option<Ipv4Addr> {
+    let ip = received_packet.get_option(Code::RequestedIpAddress as u8)?;
+    let requested_ip = util::u8_to_ipv4addr(&ip)?;
+    let ip_from_pool = dhcp_server.pick_specified_ip(requested_ip)?;
+    if util::is_ipaddr_available(ip_from_pool).is_ok() {
+        Some(requested_ip)
+    } else {
+        None
+    }
 }
 
 fn dhcp_request_message_handler_responded_to_offer(

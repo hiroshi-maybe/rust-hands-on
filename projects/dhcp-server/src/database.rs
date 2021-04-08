@@ -1,5 +1,7 @@
 use std::net::Ipv4Addr;
 
+use log::info;
+use pnet::util::MacAddr;
 use rusqlite::{params, Connection, Rows, NO_PARAMS};
 
 pub fn select_addresses(
@@ -30,4 +32,17 @@ fn get_addresses_from_row(mut ip_addrs: Rows) -> Result<Vec<Ipv4Addr>, failure::
         leased_addrs.push(ip_addr);
     }
     Ok(leased_addrs)
+}
+
+pub fn select_entry(con: &Connection, mac_addr: MacAddr) -> Result<Option<Ipv4Addr>, failure::Error> {
+    let mut stmt = con.prepare("SELECT ip_addr FROM lease_entries WHERE mac_addr = ?1")?;
+    let mut row = stmt.query(params![mac_addr.to_string()])?;
+    if let Some(entry) = row.next()? {
+        let ip = entry.get(0)?;
+        let ip_string: String = ip;
+        Ok(Some(ip_string.parse()?))
+    } else {
+        info!("Specified MAC addr was not found.");
+        Ok(None)
+    }
 }
