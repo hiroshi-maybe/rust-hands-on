@@ -6,7 +6,9 @@ use futures::{
 };
 use std::{
     collections::{HashMap, VecDeque},
-    os::unix::io::RawFd,
+    io::{BufRead, BufReader, BufWriter},
+    net::{SocketAddr, TcpListener, TcpStream},
+    os::unix::{io::RawFd, prelude::AsRawFd},
     pin::Pin,
     ptr,
     sync::{
@@ -91,7 +93,8 @@ fn main() {
     println!("Hello, world!");
 }
 
-// https://habr.com/en/post/600123/#freebsdmacos-and-kqueue
+/// IOSelector
+/// https://habr.com/en/post/600123/#freebsdmacos-and-kqueue
 
 fn write_eventfd(kq: RawFd, ident: usize) {
     let ev = ffi::Kevent {
@@ -354,5 +357,124 @@ mod ffi {
         ) -> i32;
 
         pub fn close(d: i32) -> i32;
+    }
+}
+
+/// TCP listener
+
+struct AsyncListener {
+    listener: TcpListener,
+    selector: Arc<IOSelector>,
+}
+
+impl AsyncListener {
+    fn listen(addr: &str, selector: Arc<IOSelector>) -> AsyncListener {
+        let listener = TcpListener::bind(addr).unwrap();
+
+        listener.set_nonblocking(true).unwrap();
+
+        AsyncListener {
+            listener: listener,
+            selector: selector,
+        }
+    }
+
+    fn accept(&self) -> Accept {
+        Accept { listener: self }
+    }
+}
+
+impl Drop for AsyncListener {
+    fn drop(&mut self) {
+        self.selector.unregister(self.listener.as_raw_fd());
+    }
+}
+
+struct Accept<'a> {
+    listener: &'a AsyncListener,
+}
+
+impl<'a> Future for Accept<'a> {
+    type Output = (AsyncReader, BufWriter<TcpStream>, SocketAddr);
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.listener.listener.accept() {
+            Ok((stream, addr)) => {
+                let s = stream.try_clone().unwrap();
+                Poll::Ready((
+                    AsyncReader::new(s, self.listener.selector.clone()),
+                    BufWriter::new(stream),
+                    addr,
+                ))
+            }
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::WouldBlock {
+                    self.listener.selector.register(
+                        ffi::EVFILT_READ,
+                        self.listener.listener.as_raw_fd(),
+                        cx.waker().clone(),
+                    );
+                    Poll::Pending
+                } else {
+                    panic!("acept: {}", err);
+                }
+            }
+        }
+    }
+}
+
+struct AsyncReader {
+    fd: RawFd,
+    reader: BufReader<TcpStream>,
+    selector: Arc<IOSelector>,
+}
+
+impl AsyncReader {
+    fn new(stream: TcpStream, selector: Arc<IOSelector>) -> AsyncReader {
+        stream.set_nonblocking(true).unwrap();
+        AsyncReader {
+            fd: stream.as_raw_fd(),
+            reader: BufReader::new(stream),
+            selector: selector,
+        }
+    }
+
+    fn read_line(&mut self) -> ReadLine {
+        ReadLine { reader: self }
+    }
+}
+
+impl Drop for AsyncReader {
+    fn drop(&mut self) {
+        self.selector.unregister(self.fd);
+    }
+}
+
+struct ReadLine<'a> {
+    reader: &'a mut AsyncReader,
+}
+
+impl<'a> Future for ReadLine<'a> {
+    type Output = Option<String>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut line = String::new();
+
+        match self.reader.reader.read_line(&mut line) {
+            Ok(0) => Poll::Ready(None),
+            Ok(_) => Poll::Ready(Some(line)),
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::WouldBlock {
+                    self.reader.selector.register(
+                        ffi::EVFILT_READ,
+                        self.reader.fd,
+                        cx.waker().clone(),
+                    );
+                    Poll::Pending
+                } else {
+                    Poll::Ready(None)
+                }
+            }
+        }
     }
 }
