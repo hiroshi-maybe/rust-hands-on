@@ -1,4 +1,3 @@
-use ffi::{kqueue, NOTE_TRIGGER};
 use futures::{
     future::BoxFuture,
     task::{waker_ref, ArcWake},
@@ -17,6 +16,14 @@ use std::{
     },
     task::{Context, Poll, Waker},
 };
+
+/// Echo server with async/await using kqueue instead of epoll for MacOS
+///
+/// Usage:
+/// $ socat stdio tcp:localhost:10000
+///
+/// References:
+/// * http://web.mit.edu/freebsd/head/tools/regression/kqueue/user.c
 
 struct Task {
     future: Mutex<BoxFuture<'static, ()>>,
@@ -95,19 +102,21 @@ fn main() {
     let spawner = executor.get_spawner();
 
     let server = async move {
+        println!("[ServerFuture] instantiated");
         let listener = AsyncListener::listen("127.0.0.1:10000", selector.clone());
 
         loop {
+            println!("[ServerFuture] waiting for connection accept");
             let (mut reader, mut writer, addr) = listener.accept().await;
-            println!("accept: {}", addr);
+            println!("[ServerFuture] accept: {}", addr);
 
             spawner.spawn(async move {
                 while let Some(buf) = reader.read_line().await {
-                    print!("read: {}, {}", addr, buf);
+                    print!("[ServerFuture] read: {}, {}", addr, buf);
                     writer.write(buf.as_bytes()).unwrap();
                     writer.flush().unwrap();
                 }
-                println!("close: {}", addr);
+                println!("[ServerFuture] close: {}", addr);
             });
         }
     };
@@ -120,6 +129,7 @@ fn main() {
 /// https://habr.com/en/post/600123/#freebsdmacos-and-kqueue
 
 fn write_eventfd(kq: RawFd, ident: usize) {
+    println!("[write_eventfd] New EVFILT_USER event: {}", ident);
     let ev = ffi::Kevent {
         ident: ident as u64,
         filter: ffi::EVFILT_USER,
@@ -130,12 +140,17 @@ fn write_eventfd(kq: RawFd, ident: usize) {
     };
     let read_events = vec![ev];
     let res = unsafe { ffi::kevent(kq, read_events.as_ptr(), 1, ptr::null_mut(), 0, ptr::null()) };
-    assert_eq!(res, 0);
+    if res < 0 {
+        panic!(
+            "[write_eventfd] Cannot trigger events for EVFILT_USER: {}",
+            std::io::Error::last_os_error()
+        );
+    }
 }
 
 enum IOOps {
     Add(i16, RawFd, Waker), // EVFILT_X
-    Remove(RawFd),
+    Remove(i16, RawFd),
 }
 
 struct IOSelector {
@@ -158,6 +173,7 @@ impl IOSelector {
         let result = Arc::new(s);
         let s = result.clone();
 
+        println!("[IOSelector] instantiated with kq fd {}", kq);
         std::thread::spawn(move || s.select());
 
         result
@@ -170,6 +186,10 @@ impl IOSelector {
         waker: Waker,
         wakers: &mut HashMap<RawFd, Waker>,
     ) {
+        println!(
+            "[IOSelector] add event for fd {:?} and filter {}",
+            fd, filter_flag
+        );
         let ev = ffi::Kevent {
             ident: fd as u64,
             filter: filter_flag,
@@ -192,8 +212,8 @@ impl IOSelector {
 
         if res < 0 {
             panic!(
-                "Cannot register events for adding event ({}): {}",
-                res,
+                "[IOSelector] Cannot register EV_ADD event for fd {:?}: {}",
+                fd,
                 std::io::Error::last_os_error()
             );
         }
@@ -202,10 +222,14 @@ impl IOSelector {
         wakers.insert(fd, waker);
     }
 
-    fn rm_event(&self, fd: RawFd, wakers: &mut HashMap<RawFd, Waker>) {
+    fn rm_event(&self, filter_flag: i16, fd: RawFd, wakers: &mut HashMap<RawFd, Waker>) {
+        println!(
+            "[IOSelector] remove event for fd {:?} and filter {}",
+            fd, filter_flag
+        );
         let ev = ffi::Kevent {
             ident: fd as u64,
-            filter: 0,
+            filter: filter_flag,
             flags: ffi::EV_DELETE,
             fflags: 0,
             data: 0,
@@ -225,8 +249,8 @@ impl IOSelector {
 
         if res < 0 {
             panic!(
-                "Cannot register events for adding event ({}): {}",
-                res,
+                "[IOSelector] Cannot register EV_DELETE event for fd {:?}: {}",
+                fd,
                 std::io::Error::last_os_error()
             );
         }
@@ -235,11 +259,12 @@ impl IOSelector {
     }
 
     fn select(&self) {
+        // https://stackoverflow.com/questions/16072395/using-kqueue-for-evfilt-user
         let ev = ffi::Kevent {
             ident: self.event_ident as u64,
-            filter: ffi::EVFILT_READ,
+            filter: ffi::EVFILT_USER,
             flags: ffi::EV_ADD,
-            fflags: 0,
+            fflags: ffi::NOTE_FFCOPY,
             data: 0,
             udata: 100,
         };
@@ -255,11 +280,14 @@ impl IOSelector {
             )
         };
 
-        println!("kq: {}, listen_fd: {}", self.kqfd, self.event_ident);
+        println!(
+            "[IOSelector] started observing user event: {}",
+            self.event_ident
+        );
 
         if res < 0 {
             panic!(
-                "Cannot register events: {}",
+                "[IOSelector] Cannot register events: {}",
                 std::io::Error::last_os_error()
             );
         }
@@ -291,7 +319,7 @@ impl IOSelector {
                     while let Some(op) = q.pop_front() {
                         match op {
                             IOOps::Add(flag, fd, waker) => self.add_event(flag, fd, waker, &mut t),
-                            IOOps::Remove(fd) => self.rm_event(fd, &mut t),
+                            IOOps::Remove(flag, fd) => self.rm_event(flag, fd, &mut t),
                         }
                     }
                 } else {
@@ -306,13 +334,13 @@ impl IOSelector {
     fn register(&self, flags: i16, fd: RawFd, waker: Waker) {
         let mut q = self.queue.lock().unwrap();
         q.push_back(IOOps::Add(flags, fd, waker));
-        write_eventfd(self.event_ident as i32, 1);
+        write_eventfd(self.kqfd, self.event_ident);
     }
 
-    fn unregister(&self, fd: RawFd) {
+    fn unregister(&self, flags: i16, fd: RawFd) {
         let mut q = self.queue.lock().unwrap();
-        q.push_back(IOOps::Remove(fd));
-        write_eventfd(self.event_ident as i32, 1);
+        q.push_back(IOOps::Remove(flags, fd));
+        write_eventfd(self.kqfd, self.event_ident);
     }
 }
 
@@ -329,7 +357,18 @@ mod ffi {
     // pub const EV_ENABLE: u16 = 0x4;
     pub const EV_ONESHOT: u16 = 0x10;
     pub const EV_DELETE: u16 = 0x2;
+
+    /*
+    #define NOTE_TRIGGER	0x01000000
+    #define NOTE_FFNOP      0x00000000              /* ignore input fflags */
+    #define NOTE_FFAND      0x40000000              /* and fflags */
+    #define NOTE_FFOR       0x80000000              /* or fflags */
+    #define NOTE_FFCOPY     0xc0000000              /* copy fflags */
+    #define NOTE_FFCTRLMASK 0xc0000000              /* mask for operations */
+    #define NOTE_FFLAGSMASK	0x00ffffff
+     */
     pub const NOTE_TRIGGER: u32 = 0x01000000;
+    pub const NOTE_FFCOPY: u32 = 0xc0000000; /* copy fflags */
 
     #[derive(Debug)]
     #[repr(C)]
@@ -379,6 +418,7 @@ mod ffi {
             timeout: *const Timespec,
         ) -> i32;
 
+        #[allow(dead_code)]
         pub fn close(d: i32) -> i32;
     }
 }
@@ -392,6 +432,7 @@ struct AsyncListener {
 
 impl AsyncListener {
     fn listen(addr: &str, selector: Arc<IOSelector>) -> AsyncListener {
+        println!("[AsyncListener] started listening to {}", addr);
         let listener = TcpListener::bind(addr).unwrap();
 
         listener.set_nonblocking(true).unwrap();
@@ -409,7 +450,8 @@ impl AsyncListener {
 
 impl Drop for AsyncListener {
     fn drop(&mut self) {
-        self.selector.unregister(self.listener.as_raw_fd());
+        self.selector
+            .unregister(ffi::EVFILT_READ, self.listener.as_raw_fd());
     }
 }
 
@@ -421,6 +463,7 @@ impl<'a> Future for Accept<'a> {
     type Output = (AsyncReader, BufWriter<TcpStream>, SocketAddr);
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        println!("[Accept] polled");
         match self.listener.listener.accept() {
             Ok((stream, addr)) => {
                 let s = stream.try_clone().unwrap();
@@ -439,7 +482,7 @@ impl<'a> Future for Accept<'a> {
                     );
                     Poll::Pending
                 } else {
-                    panic!("acept: {}", err);
+                    panic!("[Accept] accept: {}", err);
                 }
             }
         }
@@ -469,7 +512,7 @@ impl AsyncReader {
 
 impl Drop for AsyncReader {
     fn drop(&mut self) {
-        self.selector.unregister(self.fd);
+        self.selector.unregister(ffi::EVFILT_READ, self.fd);
     }
 }
 
