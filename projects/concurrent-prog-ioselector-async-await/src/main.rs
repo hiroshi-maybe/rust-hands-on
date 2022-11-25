@@ -190,13 +190,14 @@ impl IOSelector {
             "[IOSelector] add event for fd {:?} and filter {}",
             fd, filter_flag
         );
+
         let ev = ffi::Kevent {
             ident: fd as u64,
             filter: filter_flag,
             flags: ffi::EV_ADD | ffi::EV_ONESHOT,
             fflags: 0,
             data: 0,
-            udata: 200,
+            udata: 0,
         };
         let read_events = vec![ev];
         let res = unsafe {
@@ -218,7 +219,6 @@ impl IOSelector {
             );
         }
 
-        assert!(!wakers.contains_key(&fd));
         wakers.insert(fd, waker);
     }
 
@@ -233,7 +233,7 @@ impl IOSelector {
             flags: ffi::EV_DELETE,
             fflags: 0,
             data: 0,
-            udata: 201,
+            udata: 0,
         };
         let read_events = vec![ev];
         let res = unsafe {
@@ -255,6 +255,7 @@ impl IOSelector {
             );
         }
 
+        unsafe { ffi::close(fd) };
         wakers.remove(&fd);
     }
 
@@ -418,7 +419,6 @@ mod ffi {
             timeout: *const Timespec,
         ) -> i32;
 
-        #[allow(dead_code)]
         pub fn close(d: i32) -> i32;
     }
 }
@@ -426,20 +426,20 @@ mod ffi {
 /// TCP listener
 
 struct AsyncListener {
-    listener: TcpListener,
+    tcp_listener: TcpListener,
     selector: Arc<IOSelector>,
 }
 
 impl AsyncListener {
     fn listen(addr: &str, selector: Arc<IOSelector>) -> AsyncListener {
         println!("[AsyncListener] started listening to {}", addr);
-        let listener = TcpListener::bind(addr).unwrap();
+        let tcp_listener = TcpListener::bind(addr).unwrap();
 
-        listener.set_nonblocking(true).unwrap();
+        tcp_listener.set_nonblocking(true).unwrap();
 
         AsyncListener {
-            listener: listener,
-            selector: selector,
+            tcp_listener,
+            selector,
         }
     }
 
@@ -451,7 +451,7 @@ impl AsyncListener {
 impl Drop for AsyncListener {
     fn drop(&mut self) {
         self.selector
-            .unregister(ffi::EVFILT_READ, self.listener.as_raw_fd());
+            .unregister(ffi::EVFILT_READ, self.tcp_listener.as_raw_fd());
     }
 }
 
@@ -464,7 +464,7 @@ impl<'a> Future for Accept<'a> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         println!("[Accept] polled");
-        match self.listener.listener.accept() {
+        match self.listener.tcp_listener.accept() {
             Ok((stream, addr)) => {
                 let s = stream.try_clone().unwrap();
                 Poll::Ready((
@@ -477,7 +477,7 @@ impl<'a> Future for Accept<'a> {
                 if err.kind() == std::io::ErrorKind::WouldBlock {
                     self.listener.selector.register(
                         ffi::EVFILT_READ,
-                        self.listener.listener.as_raw_fd(),
+                        self.listener.tcp_listener.as_raw_fd(),
                         cx.waker().clone(),
                     );
                     Poll::Pending
@@ -490,7 +490,7 @@ impl<'a> Future for Accept<'a> {
 }
 
 struct AsyncReader {
-    fd: RawFd,
+    tcpstream_fd: RawFd,
     reader: BufReader<TcpStream>,
     selector: Arc<IOSelector>,
 }
@@ -499,7 +499,7 @@ impl AsyncReader {
     fn new(stream: TcpStream, selector: Arc<IOSelector>) -> AsyncReader {
         stream.set_nonblocking(true).unwrap();
         AsyncReader {
-            fd: stream.as_raw_fd(),
+            tcpstream_fd: stream.as_raw_fd(),
             reader: BufReader::new(stream),
             selector: selector,
         }
@@ -512,7 +512,9 @@ impl AsyncReader {
 
 impl Drop for AsyncReader {
     fn drop(&mut self) {
-        self.selector.unregister(ffi::EVFILT_READ, self.fd);
+        // This drop introduces "No such file or directory (os error 2)" error
+        // self.selector
+        //     .unregister(ffi::EVFILT_READ, self.tcpstream_fd);
     }
 }
 
@@ -533,7 +535,7 @@ impl<'a> Future for ReadLine<'a> {
                 if err.kind() == std::io::ErrorKind::WouldBlock {
                     self.reader.selector.register(
                         ffi::EVFILT_READ,
-                        self.reader.fd,
+                        self.reader.tcpstream_fd,
                         cx.waker().clone(),
                     );
                     Poll::Pending
