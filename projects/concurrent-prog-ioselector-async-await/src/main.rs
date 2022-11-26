@@ -24,6 +24,18 @@ use std::{
 ///
 /// References:
 /// * http://web.mit.edu/freebsd/head/tools/regression/kqueue/user.c
+/// * https://fergofrog.com/code/cbowser/xnu/bsd/sys/event.h.html
+/// * https://stackoverflow.com/questions/16072395/using-kqueue-for-evfilt-user
+/// * https://cfsamsonbooks.gitbook.io/epoll-kqueue-iocp-explained/part-1-an-express-explanation/kqueue-the-express-version
+/// * https://habr.com/en/post/600123/#freebsdmacos-and-kqueue
+/// * https://stackoverflow.com/questions/26603615/os-x-alternative-to-eventfd
+///   *  pipe or EVFILT_USER
+/// * https://github.com/rust-lang/libc/blob/c8aa8ec72d631bc35099bcf5d634cf0a0b841be0/src/unix/bsd/apple/mod.rs#L497
+/// * https://github.com/rust-lang/libc/blob/c8aa8ec72d631bc35099bcf5d634cf0a0b841be0/src/unix/bsd/apple/mod.rs#L207
+/// * https://wiki.netbsd.org/tutorials/kqueue_tutorial/
+/// * https://www.freebsd.org/cgi/man.cgi?query=eventfd&apropos=0&sektion=2&manpath=FreeBSD+13.0-RELEASE+and+Ports&arch=default&format=html
+/// * https://gist.github.com/nineright/9431572
+
 
 struct Task {
     future: Mutex<BoxFuture<'static, ()>>,
@@ -124,9 +136,6 @@ fn main() {
     executor.get_spawner().spawn(server);
     executor.run();
 }
-
-/// IOSelector
-/// https://habr.com/en/post/600123/#freebsdmacos-and-kqueue
 
 fn write_eventfd(kq: RawFd, ident: usize) {
     println!("[write_eventfd] New EVFILT_USER event: {}", ident);
