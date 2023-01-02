@@ -13,38 +13,41 @@
 .global SET_CONTEXT
 .global SWITCH_CONTEXT
 
+# store callee-saved registers
 # rdi: first arg `Registers`
 SET_CONTEXT:
-    # store callee-saved registers
-    mov [rdi + 0x00], rl5
-    mov [rdi + 0x08], rl4
-    mov [rdi + 0x10], rl3
-    mov [rdi + 0x18], rl2
-    mov [rdi + 0x20], rbx
-    mov [rdi + 0x28], rbp
+    mov %r15, 0x00(%rdi)
+    mov %r14, 0x08(%rdi)
+    mov %r13, 0x10(%rdi)
+    mov %r12, 0x18(%rdi)
+    mov %rbx, 0x20(%rdi)
+    mov %rbp, 0x28(%rdi)
 
-    # store stack pointer of the caller
-    lea rax, [rsp + 8]
-    mov [rdi + 0x30] rax
+    # store stack pointer (rsp) of the caller
+    lea 8(%rsp), %rax
+    mov %rax, 0x30(%rdi)
 
-    # store instruction pointer before context switch
-    mov rax, [rsp]
-    mov [rdi + 0x38] rax
+    # store instruction pointer (rip) before context switch
+    mov (%rsp), %rax
+    mov %rax, 0x38(%rdi)
 
-    mov rax $0
+    mov $0, %rax
     ret
 
+# restore calee-saved registers
 # rdi: first arg `Registers`, rsi: second arg
 SWITCH_CONTEXT:
-    # restore calee-saved registers
-    mov rl5, [rdi + 0x00]
-    mov rl4, [rdi + 0x08]
-    mov rl3, [rdi + 0x10]
-    mov rl2, [rdi + 0x18]
-    mov rbx, [rdi + 0x20]
-    mov rbp, [rdi + 0x28]
-    mov rsp, [rdi + 0x30]
-    mov rip, [rdi + 0x38]
 
-    mov rax $0
+    # push to the stack so that %rip is updated upon `ret` call
+    pushq 0x38(%rdi)
+
+    mov 0x00(%rdi), %r15
+    mov 0x08(%rdi), %r14
+    mov 0x10(%rdi), %r13
+    mov 0x18(%rdi), %r12
+    mov 0x20(%rdi), %rbx
+    mov 0x28(%rdi), %rbp
+    mov 0x30(%rdi), %rsp
+
+    mov $0, %rax
     ret

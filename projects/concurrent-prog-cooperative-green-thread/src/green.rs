@@ -4,7 +4,9 @@ use std::collections::{HashSet, LinkedList};
 use std::ffi::c_void;
 use std::ptr;
 
-// https://c9x.me/articles/gthreads/mach.html
+/// References:
+/// * https://c9x.me/articles/gthreads/mach.html
+/// * https://cs.brown.edu/courses/csci1310/2020/notes/l08.html#:~:text=The%20%25rip%20register%20on%20x86,in%20the%20program's%20code%20segment.
 
 #[repr(C)]
 struct Registers {
