@@ -11,3 +11,7 @@ Cargo.lock
 
 # For Mac OS
 .DS_Store
+
+# Object files and libraries
+**/asm/*.o
+**/asm/*.a
