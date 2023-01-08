@@ -1,4 +1,5 @@
 use nix::sys::mman::{mprotect, ProtFlags};
+use nix::unistd::SysconfVar;
 use std::alloc::{alloc, dealloc, Layout};
 use std::collections::{HashSet, LinkedList};
 use std::ffi::c_void;
@@ -8,6 +9,7 @@ use std::ptr;
 /// * https://c9x.me/articles/gthreads/mach.html
 /// * https://cs.brown.edu/courses/csci1310/2020/notes/l08.html#:~:text=The%20%25rip%20register%20on%20x86,in%20the%20program's%20code%20segment.
 
+#[derive(Debug)]
 #[repr(C)]
 struct Registers {
     r15: u64, // callee-saved register; optionally used as GOT base pointer
@@ -26,9 +28,10 @@ struct Registers {
 
 impl Registers {
     fn new(rsp: u64) -> Self {
-        // x86_64 16 byte alignment
+        // x86_64 16 byte alignment, but it should be taken care by `Layout::from_size_align()` call
         // See https://cfsamson.gitbook.io/green-threads-explained-in-200-lines-of-rust/the-stack
-        let rsp = rsp & !15;
+        let aligned_rsp = rsp & !15;
+        assert_eq!(aligned_rsp, rsp);
         Registers {
             r15: 0,
             r14: 0,
@@ -37,7 +40,7 @@ impl Registers {
             rbx: 0,
             rbp: 0,
             rip: entry_point as u64,
-            rsp,
+            rsp: aligned_rsp,
         }
     }
 }
@@ -48,8 +51,15 @@ extern "C" {
 }
 
 type Entry = fn();
-const PAGE_SIZE: usize = 4 * 1024; // 4KiB
 
+fn get_page_size() -> usize {
+    // 4KiB in my Mac, that is the same value as Linux
+    nix::unistd::sysconf(SysconfVar::PAGE_SIZE)
+        .unwrap()
+        .unwrap() as usize
+}
+
+#[derive(Debug)]
 struct Context {
     regs: Registers,
     stack: *mut u8,
@@ -66,12 +76,21 @@ impl Context {
         &self.regs as *const Registers
     }
     fn new(func: Entry, stack_size: usize, id: u64) -> Self {
-        let layout = Layout::from_size_align(stack_size, PAGE_SIZE).unwrap();
+        let layout = Layout::from_size_align(stack_size, get_page_size()).unwrap();
+        println!("page size: {}, layout: {:?}", get_page_size(), layout);
         let stack = unsafe { alloc(layout) };
 
-        unsafe { mprotect(stack as *mut c_void, PAGE_SIZE, ProtFlags::PROT_NONE) };
+        // Protect stack for potential stack overflow
+        unsafe { mprotect(stack as *mut c_void, get_page_size(), ProtFlags::PROT_NONE).unwrap() };
 
         let regs = Registers::new(stack as u64 + stack_size as u64);
+
+        println!(
+            "stack top: {}, stack size: {}, stack bottom {}",
+            stack as u64,
+            stack_size,
+            stack as u64 + stack_size as u64
+        );
 
         Context {
             regs,
@@ -104,6 +123,7 @@ pub fn spawn(func: Entry, stack_size: usize) -> u64 {
     unsafe {
         let id = get_id();
         CONTEXTS.push_back(Box::new(Context::new(func, stack_size, id)));
+        println!("[{}] spawned", id);
         schedule();
         id
     }
@@ -117,6 +137,7 @@ pub fn schedule() {
 
         let mut ctx = CONTEXTS.pop_front().unwrap();
         let regs = ctx.get_regs_mut();
+        println!("[{}] set_context being called", ctx.id);
         CONTEXTS.push_back(ctx);
 
         if set_context(regs) == 0 {
@@ -158,6 +179,7 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
             panic!("spawn_from_main is called twice");
         }
 
+        println!("create root context from main");
         CTX_MAIN = Some(Box::new(Registers::new(0)));
         if let Some(ctx) = &mut CTX_MAIN {
             // let mut msgs = MappedList::new();
@@ -169,9 +191,13 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
             let mut ids = HashSet::new();
             ID = &mut ids as *mut HashSet<u64>;
 
-            if set_context(&mut **ctx as *mut Registers) == 0 {
+            println!("set_context from `spawn_from_main()`");
+            let set_context_res = set_context(&mut **ctx as *mut Registers);
+            println!("set_context done {}", set_context_res);
+            if set_context_res == 0 {
                 CONTEXTS.push_back(Box::new(Context::new(func, stack_size, get_id())));
                 let first = CONTEXTS.front().unwrap();
+                println!("context to be switched to: {:?}", first);
                 switch_context(first.get_regs());
             }
 
@@ -194,7 +220,7 @@ unsafe fn rm_unused_stack() {
     if UNUSED_STACK.0 != ptr::null_mut() {
         mprotect(
             UNUSED_STACK.0 as *mut c_void,
-            PAGE_SIZE,
+            get_page_size(),
             ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
         )
         .unwrap();

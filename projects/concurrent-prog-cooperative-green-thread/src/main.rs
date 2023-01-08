@@ -26,5 +26,6 @@ fn gaia() {
 }
 
 fn main() {
+    println!("main called");
     green::spawn_from_main(gaia, 2 * 1024 * 1024);
 }
