@@ -22,7 +22,7 @@ struct Registers {
     // x87_cw: u64, // x87 control word
 
     // 0x30 offset
-    rip: u64, // caller-saved register for link register to return
+    rdx: u64, // ~caller-saved register for link register to return~
     rsp: u64, // caller-saved register for stack pointer to restore stack
 }
 
@@ -39,7 +39,7 @@ impl Registers {
             r12: 0,
             rbx: 0,
             rbp: 0,
-            rip: entry_point as u64,
+            rdx: entry_point as u64,
             rsp: aligned_rsp,
         }
     }
@@ -77,7 +77,12 @@ impl Context {
     }
     fn new(func: Entry, stack_size: usize, id: u64) -> Self {
         let layout = Layout::from_size_align(stack_size, get_page_size()).unwrap();
-        println!("page size: {}, layout: {:?}", get_page_size(), layout);
+        println!(
+            "id: {}, page size: {}, layout: {:?}",
+            id,
+            get_page_size(),
+            layout
+        );
         let stack = unsafe { alloc(layout) };
 
         // Protect stack for potential stack overflow
@@ -86,10 +91,12 @@ impl Context {
         let regs = Registers::new(stack as u64 + stack_size as u64);
 
         println!(
-            "stack top: {}, stack size: {}, stack bottom {}",
+            "id: {}, stack top: {}, stack size: {}, stack bottom {}, entry_point {}",
+            id,
             stack as u64,
             stack_size,
-            stack as u64 + stack_size as u64
+            stack as u64 + stack_size as u64,
+            entry_point as u64,
         );
 
         Context {
@@ -150,6 +157,8 @@ pub fn schedule() {
 }
 
 extern "C" fn entry_point() {
+    // debug_regs();
+    println!("entry_point() called");
     unsafe {
         let ctx = CONTEXTS.front().unwrap();
         ((**ctx).entry)();
@@ -192,12 +201,14 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
             ID = &mut ids as *mut HashSet<u64>;
 
             println!("set_context from `spawn_from_main()`");
+            // debug_regs();
             let set_context_res = set_context(&mut **ctx as *mut Registers);
             println!("set_context done {}", set_context_res);
             if set_context_res == 0 {
                 CONTEXTS.push_back(Box::new(Context::new(func, stack_size, get_id())));
                 let first = CONTEXTS.front().unwrap();
                 println!("context to be switched to: {:?}", first);
+                // debug_regs();
                 switch_context(first.get_regs());
             }
 
