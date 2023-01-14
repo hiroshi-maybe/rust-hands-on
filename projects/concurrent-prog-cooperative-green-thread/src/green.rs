@@ -12,18 +12,14 @@ use std::ptr;
 #[derive(Debug)]
 #[repr(C)]
 struct Registers {
-    r15: u64, // callee-saved register; optionally used as GOT base pointer
-    r14: u64,
-    r13: u64,
+    rbx: u64,
+    rbp: u64,
     r12: u64,
-    rbx: u64, // callee-saved register
-    rbp: u64, // callee-saved register; optionally used as frame pointer
-    // xcsr: u64, // SSE2 control and status word
-    // x87_cw: u64, // x87 control word
-
-    // 0x30 offset
-    rdx: u64, // ~caller-saved register for link register to return~
-    rsp: u64, // caller-saved register for stack pointer to restore stack
+    r13: u64,
+    r14: u64,
+    r15: u64,
+    rsp: u64,
+    rdx: u64,
 }
 
 impl Registers {
@@ -33,14 +29,14 @@ impl Registers {
         let aligned_rsp = rsp & !15;
         assert_eq!(aligned_rsp, rsp);
         Registers {
-            r15: 0,
-            r14: 0,
-            r13: 0,
-            r12: 0,
             rbx: 0,
             rbp: 0,
-            rdx: entry_point as u64,
-            rsp: aligned_rsp,
+            r12: 0,
+            r13: 0,
+            r14: 0,
+            r15: 0,
+            rsp,
+            rdx: entry_point as u64, // <4>
         }
     }
 }
@@ -75,6 +71,8 @@ impl Context {
     fn get_regs(&self) -> *const Registers {
         &self.regs as *const Registers
     }
+
+    #[inline(never)]
     fn new(func: Entry, stack_size: usize, id: u64) -> Self {
         let layout = Layout::from_size_align(stack_size, get_page_size()).unwrap();
         println!(
@@ -156,7 +154,8 @@ pub fn schedule() {
     }
 }
 
-extern "C" fn entry_point() {
+#[no_mangle]
+pub extern "C" fn entry_point() {
     // debug_regs();
     println!("entry_point() called");
     unsafe {
@@ -201,7 +200,6 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
             ID = &mut ids as *mut HashSet<u64>;
 
             println!("set_context from `spawn_from_main()`");
-            // debug_regs();
             let set_context_res = set_context(&mut **ctx as *mut Registers);
             println!("set_context done {}", set_context_res);
             if set_context_res == 0 {
