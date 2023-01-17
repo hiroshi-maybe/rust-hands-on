@@ -6,8 +6,10 @@ use std::ffi::c_void;
 use std::ptr;
 
 /// References:
+/// * https://github.com/oreilly-japan/conc_ytakano/blob/main/chap6/ch6_mult-x86_64-linux
 /// * https://c9x.me/articles/gthreads/mach.html
 /// * https://cs.brown.edu/courses/csci1310/2020/notes/l08.html#:~:text=The%20%25rip%20register%20on%20x86,in%20the%20program's%20code%20segment.
+/// * https://www.cs.princeton.edu/courses/archive/spr18/cos217/lectures/15_AssemblyFunctions.pdf
 
 #[derive(Debug)]
 #[repr(C)]
@@ -145,8 +147,12 @@ pub fn schedule() {
         println!("[{}] set_context being called", ctx.id);
         CONTEXTS.push_back(ctx);
 
-        if set_context(regs) == 0 {
+        println!("set_context from `schedule()`");
+        let set_context_res = set_context(regs);
+        println!("set_context done: {:?}", *regs);
+        if set_context_res == 0 {
             let next = CONTEXTS.front().unwrap();
+            println!("context to be switched to: {:?}", next);
             switch_context((**next).get_regs());
         }
 
@@ -160,7 +166,9 @@ pub extern "C" fn entry_point() {
     println!("entry_point() called");
     unsafe {
         let ctx = CONTEXTS.front().unwrap();
+        println!("start calling {}", ctx.id);
         ((**ctx).entry)();
+        println!("finish calling {}", ctx.id);
 
         let ctx = CONTEXTS.pop_front().unwrap();
 
@@ -169,10 +177,12 @@ pub extern "C" fn entry_point() {
 
         match CONTEXTS.front() {
             Some(c) => {
+                println!("switching to {}", c.id);
                 switch_context((**c).get_regs());
             }
             None => {
                 if let Some(c) = &CTX_MAIN {
+                    println!("back to the main root context");
                     switch_context(&**c as *const Registers);
                 }
             }
@@ -201,7 +211,7 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
 
             println!("set_context from `spawn_from_main()`");
             let set_context_res = set_context(&mut **ctx as *mut Registers);
-            println!("set_context done {}", set_context_res);
+            println!("set_context done: {:?}", ctx);
             if set_context_res == 0 {
                 CONTEXTS.push_back(Box::new(Context::new(func, stack_size, get_id())));
                 let first = CONTEXTS.front().unwrap();

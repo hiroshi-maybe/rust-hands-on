@@ -18,6 +18,7 @@ fn ortega() {
 }
 
 fn gaia() {
+    println!("Gaia called");
     green::spawn(mash, 2 * 1024 * 1024);
     for _ in 0..10 {
         println!("Gaia!");

@@ -1,0 +1,41 @@
+main called
+create root context from main
+set_context from `spawn_from_main()`
+set_context done: Registers { rbx: 140701871226880, rbp: 140701879610256, r12: 140701871230976, r13: 140704325620928, r14: 4469719936, r15: 140701879610640, rsp: 140701879609504, rdx: 4469233051 }
+id: 15001850314017541697, page size: 4096, layout: Layout { size_: 2097152, align_: 4096 }
+id: 15001850314017541697, stack top: 140241142808576, stack size: 2097152, stack bottom 140241144905728, entry_point 4469231520
+context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241144905728, rdx: 4469231520 }, stack: 0x7f8c6f800000, stack_layout: Layout { size_: 2097152, align_: 4096 }, entry: 0x10a6337e0, id: 15001850314017541697 }
+entry_point() called
+start calling 15001850314017541697
+Gaia called
+id: 3131209044456449916, page size: 4096, layout: Layout { size_: 2097152, align_: 4096 }
+id: 3131209044456449916, stack top: 140241144909824, stack size: 2097152, stack bottom 140241147006976, entry_point 4469231520
+[3131209044456449916] spawned
+[15001850314017541697] set_context being called
+set_context from `schedule()`
+set_context done: Registers { rbx: 0, rbp: 140241144904656, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241144904176, rdx: 4469231073 }
+context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241147006976, rdx: 4469231520 }, stack: 0x7f8c6fa01000, stack_layout: Layout { size_: 2097152, align_: 4096 }, entry: 0x10a633690, id: 3131209044456449916 }
+[1]    84294 segmentation fault  cargo run
+
+15001850314017541697: gaia()'s ID
+3131209044456449916: mash()'s ID
+
+-- text
+
+4469231073: gaia's schedule()'s return address for set_context() call
+4469231520: entry_point()
+4469233051: spawn_from_main's return address for set_context() call
+
+-- heap
+
+140241144904176: gaia's stack pointer
+140241144904656: gaia's new frame pointer
+140241144905736: stack pointer of entry_point() (i.e. 140241144905728 + 8)
+
+140241147006976: mash's frame pointer
+
+-- stack
+
+140701879610256: spawn_from_main's stack pointer at set_context() call
+140701889231760: spawn_from_main's frame pointer
+
