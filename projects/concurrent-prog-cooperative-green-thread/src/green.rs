@@ -46,6 +46,7 @@ impl Registers {
 extern "C" {
     fn set_context(ctx: *mut Registers) -> u64;
     fn switch_context(ctx: *const Registers) -> !;
+    fn switch_context2(ctx: *const Registers) -> !;
 }
 
 type Entry = fn();
@@ -153,7 +154,7 @@ pub fn schedule() {
         if set_context_res == 0 {
             let next = CONTEXTS.front().unwrap();
             println!("context to be switched to: {:?}", next);
-            switch_context((**next).get_regs());
+            switch_context2((**next).get_regs());
         }
 
         rm_unused_stack();

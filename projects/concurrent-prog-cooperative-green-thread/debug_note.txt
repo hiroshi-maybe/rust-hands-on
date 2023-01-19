@@ -5,6 +5,7 @@ set_context done: Registers { rbx: 140701871226880, rbp: 140701879610256, r12: 1
 id: 15001850314017541697, page size: 4096, layout: Layout { size_: 2097152, align_: 4096 }
 id: 15001850314017541697, stack top: 140241142808576, stack size: 2097152, stack bottom 140241144905728, entry_point 4469231520
 context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241144905728, rdx: 4469231520 }, stack: 0x7f8c6f800000, stack_layout: Layout { size_: 2097152, align_: 4096 }, entry: 0x10a6337e0, id: 15001850314017541697 }
+
 entry_point() called
 start calling 15001850314017541697
 Gaia called
@@ -17,8 +18,8 @@ set_context done: Registers { rbx: 0, rbp: 140241144904656, r12: 0, r13: 0, r14:
 context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241147006976, rdx: 4469231520 }, stack: 0x7f8c6fa01000, stack_layout: Layout { size_: 2097152, align_: 4096 }, entry: 0x10a633690, id: 3131209044456449916 }
 [1]    84294 segmentation fault  cargo run
 
-15001850314017541697: gaia()'s ID
 3131209044456449916: mash()'s ID
+15001850314017541697: gaia()'s ID
 
 -- text
 
@@ -28,14 +29,24 @@ context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r
 
 -- heap
 
-140241144904176: gaia's stack pointer
-140241144904656: gaia's new frame pointer
-140241144905736: stack pointer of entry_point() (i.e. 140241144905728 + 8)
+140241142808576: stack top
 
-140241147006976: mash's frame pointer
+140241144904176: gaia's stack pointer
+140241144904656: frame pointer for schedule() call
+...
+140241144905704: return address of switch_context() call
+140241144905712: 0 from context.rbp
+140241144905720: # addq    $0x8, %rsp
+140241144905728: stack bottom
+
+140241144909824: mash's stack top
+
+140241147006952: return address of switch_context() call
+140241147006960: 0 from context.rbp
+140241147006968: # addq    $0x8, %rsp
+140241147006976: mash's stack bottom
 
 -- stack
 
 140701879610256: spawn_from_main's stack pointer at set_context() call
 140701889231760: spawn_from_main's frame pointer
-
