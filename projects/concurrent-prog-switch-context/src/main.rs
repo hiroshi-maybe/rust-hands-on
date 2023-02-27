@@ -1,3 +1,5 @@
+use std::process::exit;
+
 use green::Registers;
 use volatile::Volatile;
 
@@ -10,7 +12,8 @@ extern "C" {
     fn set_context(ctx: *const Registers) -> !;
 }
 
-fn main() {
+#[allow(dead_code)]
+fn repeat_context() {
     let mut x = 0;
     let mut volatile = Volatile::new(&mut x);
 
@@ -28,4 +31,26 @@ fn main() {
             set_context(r);
         }
     }
+}
+
+fn foo() {
+    println!("foo called");
+
+    // No return address. So SEGV occurs without this
+    exit(1);
+}
+
+#[allow(dead_code)]
+fn switch_to_foo() {
+    let mut regs = Registers::new_with_stack(2 * 1024 * 1024, foo as u64);
+    let r = &mut regs as *mut Registers;
+
+    unsafe {
+        set_context(r);
+    }
+}
+
+fn main() {
+    // repeat_context();
+    switch_to_foo();
 }

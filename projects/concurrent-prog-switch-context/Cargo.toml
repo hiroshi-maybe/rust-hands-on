@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 volatile = "0.4.6"
+nix = "0.20.0"
