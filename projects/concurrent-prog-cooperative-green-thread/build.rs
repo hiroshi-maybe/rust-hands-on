@@ -10,6 +10,15 @@ fn main() {
         .arg(O_FILE)
         .status()
         .unwrap();
+    // Command::new("as")
+    //     // .args(&["-f", "maco64", ASM_FILE, "-o", O_FILE])
+    //     .args(&[ASM_FILE, "-o", O_FILE])
+    //     .status()
+    //     .unwrap();
+    // Command::new("libtool")
+    //     .args(&["-static", "-o", LIB_FILE, O_FILE])
+    //     .status()
+    //     .unwrap();
     Command::new("ar")
         .args(&["crus", LIB_FILE, O_FILE])
         .status()
@@ -17,5 +26,5 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", "asm");
     println!("cargo:rustc-link-lib=static=context");
-    println!("cargo:return-if-changed=asm/context.S");
+    println!("cargo:rerun-if-changed=asm/context.S");
 }
