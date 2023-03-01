@@ -10,16 +10,19 @@ use std::ptr;
 /// * https://c9x.me/articles/gthreads/mach.html
 /// * https://cs.brown.edu/courses/csci1310/2020/notes/l08.html#:~:text=The%20%25rip%20register%20on%20x86,in%20the%20program's%20code%20segment.
 /// * https://www.cs.princeton.edu/courses/archive/spr18/cos217/lectures/15_AssemblyFunctions.pdf
+/// * https://www.imperialviolet.org/2017/01/18/cfi.html
 
 #[derive(Debug)]
 #[repr(C)]
 struct Registers {
+    // should be preserved for calling function - start
     rbx: u64,
     rbp: u64,
     r12: u64,
     r13: u64,
     r14: u64,
     r15: u64,
+    // should be preserved for calling function - end
     rsp: u64,
     rdx: u64,
 }
@@ -46,7 +49,16 @@ impl Registers {
 extern "C" {
     fn set_context(ctx: *mut Registers) -> u64;
     fn switch_context(ctx: *const Registers) -> !;
-    fn switch_context2(ctx: *const Registers) -> !;
+    // fn switch_context2(ctx: *const Registers) -> !;
+}
+
+macro_rules! debug_reg {
+    () => {
+        let mut reg = Registers::new(0);
+        let r = &mut reg as *mut Registers;
+        set_context(r);
+        println!("[DEBUG] curent reg: {:?}", reg);
+    };
 }
 
 type Entry = fn();
@@ -117,19 +129,33 @@ static mut CONTEXTS: LinkedList<Box<Context>> = LinkedList::new();
 static mut ID: *mut HashSet<u64> = ptr::null_mut();
 
 fn get_id() -> u64 {
+    println!("get_id() called");
     loop {
         let rnd = rand::random::<u64>();
+        println!("id {} generated", rnd);
+
         unsafe {
-            if (*ID).insert(rnd) {
+            if !(*ID).contains(&rnd) {
+                // <2>
+                (*ID).insert(rnd); // <3>
                 return rnd;
-            }
+            };
         }
+
+        // unsafe {
+        //     if (*ID).insert(rnd) {
+        //         println!("{} inserted", rnd);
+        //         return rnd;
+        //     }
+        // }
     }
 }
 
 pub fn spawn(func: Entry, stack_size: usize) -> u64 {
     unsafe {
+        println!("spawn called");
         let id = get_id();
+        println!("[{}] ID generated", id);
         CONTEXTS.push_back(Box::new(Context::new(func, stack_size, id)));
         println!("[{}] spawned", id);
         schedule();
@@ -154,7 +180,8 @@ pub fn schedule() {
         if set_context_res == 0 {
             let next = CONTEXTS.front().unwrap();
             println!("context to be switched to: {:?}", next);
-            switch_context2((**next).get_regs());
+            // switch_context2((**next).get_regs());
+            switch_context((**next).get_regs());
         }
 
         rm_unused_stack();
@@ -163,10 +190,11 @@ pub fn schedule() {
 
 #[no_mangle]
 pub extern "C" fn entry_point() {
-    // debug_regs();
     println!("entry_point() called");
     unsafe {
         let ctx = CONTEXTS.front().unwrap();
+        debug_reg!();
+        println!("test contains call: {}", (*ID).contains(&ctx.id));
         println!("start calling {}", ctx.id);
         ((**ctx).entry)();
         println!("finish calling {}", ctx.id);
@@ -217,7 +245,6 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
                 CONTEXTS.push_back(Box::new(Context::new(func, stack_size, get_id())));
                 let first = CONTEXTS.front().unwrap();
                 println!("context to be switched to: {:?}", first);
-                // debug_regs();
                 switch_context(first.get_regs());
             }
 
