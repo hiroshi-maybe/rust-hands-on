@@ -22,6 +22,9 @@ macro_rules! debug_reg {
             get_context(r);
         }
         println!("[DEBUG] curent reg: {:?}", reg);
+        unsafe {
+            assert_eq!((*r).rbp % 16, 0);
+        }
     };
 }
 
@@ -114,8 +117,8 @@ fn bar() {
     debug_reg!();
 
     const KEY_LEN: usize = core::mem::size_of::<u64>();
-    let x = [0u8; KEY_LEN * 2];
-    println!("{:?}", x);
+    let x = [0u8; 16];
+    println!("{}, {:?}", KEY_LEN, x);
 
     let x = hashmap_random_keys();
     println!("{:?}", x);

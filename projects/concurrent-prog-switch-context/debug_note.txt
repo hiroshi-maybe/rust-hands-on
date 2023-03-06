@@ -27,6 +27,9 @@ $ register read
 Ltmp280:
         .loc    1 118 5
 
+7. Looks like 16-bytes alignment of MOVAPS is the issue. Yes, it's the root cause!
+https://stackoverflow.com/questions/67243284/why-movaps-causes-segmentation-fault
+
 
 140454154731520 top
 ...(empty)...

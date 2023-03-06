@@ -37,6 +37,11 @@ GET_CONTEXT:
     movq    (%rsp), %rdx
     movq    %rdx, 0x38(%rdi)    /* rdx */
     # movq    $1016, 0x38(%rdi)
+
+    # xorps   %xmm0, %xmm0
+    # movaps  %xmm0, -192(%rbp) # SEGV
+    # movq    %xmm0, -192(%rbp) # No SEGV
+
     ret
 
 .text
@@ -62,7 +67,6 @@ SET_CONTEXT:
     # pushq   %rbp    # maybe saving %rbp register for subsequent function entry_point()?
     # pushq   %rsi
 
-    # pushq    %rsi
     # movq    56(%rdi), %rdx
     # jmpq    *%rdx   # jump to entry_point()
     pushq   56(%rdi)
@@ -93,7 +97,7 @@ SWITCH_CONTEXT:
     movq    32(%rdi), %r14
     movq    40(%rdi), %r15
     movq    48(%rdi), %rdx # rsp in Registers
-    movq    %rdx, %rsp  # configure rsp with the memory in heap    
+    movq    %rdx, %rsp  # configure rsp with the memory in heap
 
     pushq   56(%rdi) # jump to foo2()
     ret

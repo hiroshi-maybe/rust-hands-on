@@ -14,15 +14,15 @@ fn get_page_size() -> usize {
 #[repr(C)]
 pub struct Registers {
     // should be preserved for calling function - start
-    rbx: u64,
-    rbp: u64,
-    r12: u64,
-    r13: u64,
-    r14: u64,
-    r15: u64,
+    pub rbx: u64,
+    pub rbp: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
     // should be preserved for calling function - end
-    rsp: u64,
-    rdx: u64,
+    pub rsp: u64,
+    pub rdx: u64,
 }
 
 impl Registers {
