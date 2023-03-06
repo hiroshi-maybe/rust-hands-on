@@ -1,0 +1,67 @@
+1. Created a separate project to reproduce the issue in small code
+2. Ran code with lldb and figured out that crash is happening in `std::sys::unix::rand::hashmap_random_keys`
+
+> Process 80240 stopped
+* thread #1, name = 'main', queue = 'com.apple.main-thread', stop reason = EXC_BAD_ACCESS (code=EXC_I386_GPFLT)
+    frame #0: 0x000000010002a3c5 concurrent-prog-switch-context`std::sys::unix::rand::hashmap_random_keys::h8241bdb5c2fdfe5a at rand.rs:4:17 [opt]
+3. Copied over the private function and reproduced the crash in array memory allocation.
+
+> Process 95284 stopped
+* thread #1, name = 'main', queue = 'com.apple.main-thread', stop reason = EXC_BAD_ACCESS (code=EXC_I386_GPFLT)
+    frame #0: 0x00000001000028e3 concurrent-prog-switch-context`concurrent_prog_switch_context::hashmap_random_keys::haffd4ac6390c57d8 at main.rs:71:17
+
+4. Take a look at asm
+$ cargo rustc -- --emit asm
+
+5. Try to debug with lldb
+$ frame variable
+$ l
+$ register read
+
+6. Looks like it crashes when xmm0 registers are involved...
+
+        .loc    1 117 13 is_stmt 1
+        xorps   %xmm0, %xmm0
+        movaps  %xmm0, -176(%rbp)
+        leaq    -176(%rbp), %rdi
+Ltmp280:
+        .loc    1 118 5
+
+
+140454154731520 top
+...(empty)...
+
+140454188285080 <- %rsp of hashmap_random_keys()
+..
+140454188285624 = %rbp of bar <- %rbp of hashmap_random_keys()
+140454188285632 = return address of hashmap_random_keys()
+--
+140454188285640 <- %rsp of bar
+...
+140454188285944 <- %rbp of bar
+140454188285952 = bottom
+
+
+(lldb)  register read
+General Purpose Registers:
+       rax = 0x0000000000000000
+       rbx = 0x0000000000000000
+       rcx = 0x00006000017041a0
+       rdx = 0x0000000000000001
+       rdi = 0x0000600001704180
+       rsi = 0x000000010003fd14
+       rbp = 0x0000000102fffeb8
+       rsp = 0x0000000102fffc98
+        r8 = 0x0000000000000000
+        r9 = 0xfefefefefefefeff
+       r10 = 0x000000010004810a  concurrent-prog-switch-context`std::panicking::panic_count::LOCAL_PANIC_COUNT::__getit::VAL::h72525465f254e6fd (.0$tlv$init) + 2
+       r11 = 0x0000000002fc84ec
+       r12 = 0x0000000000000000
+       r13 = 0x0000000000000000
+       r14 = 0x0000000000000000
+       r15 = 0x0000000000000000
+       rip = 0x00000001000028e3  concurrent-prog-switch-context`concurrent_prog_switch_context::hashmap_random_keys::haffd4ac6390c57d8 + 243 at main.rs:71:17
+    rflags = 0x0000000000010212
+        cs = 0x000000000000002b
+        fs = 0x0000000000000000
+        gs = 0x0000000000000000

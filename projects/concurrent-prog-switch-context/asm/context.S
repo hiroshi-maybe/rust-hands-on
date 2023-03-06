@@ -58,7 +58,7 @@ SET_CONTEXT:
     movq    48(%rdi), %rdx # rsp in Registers
     movq    %rdx, %rsp  # configure rsp with the memory in heap
 
-    # addq    $0x8, %rsp  # move stack pointer by one word
+    # addq    $0x8, %rsp  # move stack pointer by one word for pseudo return address
     # pushq   %rbp    # maybe saving %rbp register for subsequent function entry_point()?
     # pushq   %rsi
 
@@ -93,6 +93,7 @@ SWITCH_CONTEXT:
     movq    32(%rdi), %r14
     movq    40(%rdi), %r15
     movq    48(%rdi), %rdx # rsp in Registers
-    movq    %rdx, %rsp  # configure rsp with the memory in heap
+    movq    %rdx, %rsp  # configure rsp with the memory in heap    
+
     pushq   56(%rdi) # jump to foo2()
     ret
