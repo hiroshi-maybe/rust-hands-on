@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fs::File, io::Read, process::exit};
+use std::process::exit;
 
 use green::Registers;
 use volatile::Volatile;
@@ -6,11 +6,13 @@ use volatile::Volatile;
 /// References
 /// * https://graphitemaster.github.io/fibers/
 /// * https://dev.to/bmatcuk/debugging-rust-with-rust-lldb-j1f
+/// * https://stackoverflow.com/questions/71106599/understanding-16-byte-padding-and-function-prolog-in-x64-assembly
 mod green;
 
 extern "C" {
     fn get_context(ctx: *mut Registers) -> u64;
-    fn set_context(ctx: *const Registers);
+    fn jump_to_func(ctx: *const Registers);
+    fn restore_old_context(ctx: *const Registers);
     fn switch_context(ctx1: *const Registers, ctx2: *mut Registers);
 }
 
@@ -44,7 +46,7 @@ fn repeat_context() {
     if volatile.read() == 0 {
         volatile.write(1);
         unsafe {
-            set_context(r);
+            restore_old_context(r);
         }
     }
 }
@@ -63,7 +65,7 @@ fn switch_to_foo() {
     let r = &mut regs as *mut Registers;
 
     unsafe {
-        set_context(r);
+        jump_to_func(r);
     }
 }
 
@@ -138,7 +140,8 @@ fn bar() {
 
     unsafe {
         if let Some(r1) = &mut REG_MAIN {
-            set_context(&mut **r1 as *mut Registers);
+            println!("switch to: {:?}", *r1);
+            restore_old_context(&mut **r1 as *mut Registers);
         }
     }
 }

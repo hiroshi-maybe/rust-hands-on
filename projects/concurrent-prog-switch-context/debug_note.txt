@@ -30,6 +30,20 @@ Ltmp280:
 7. Looks like 16-bytes alignment of MOVAPS is the issue. Yes, it's the root cause!
 https://stackoverflow.com/questions/67243284/why-movaps-causes-segmentation-fault
 
+8. Produced assembly is putting 16 bytes aligned memory address to %rbp. So the problem is that %rbp is not 16 bytes aligned.
+        .loc    1 120 13 is_stmt 1
+        xorps   %xmm0, %xmm0
+        movaps  %xmm0, -208(%rbp)
+
+set_context():
+ (%rsp)%16=0 in `movq    %rdx, %rsp`
+ (%rsp)%16=8 in `pushq   56(%rdi)`
+ (%rsp)%16=0 in `ret` by popping and jumping
+bar():
+ (%rsp)%16=8 in `pushq   %rbp`
+ !!!NOW!!! (%rbp)%16=8 in `movq    %rsp, %rbp`
+
+9. fixed with `addq    $0x8, %rsp` which pads for 16 bytes alignment. Right after `callq xxxx` (i.e. right after return address is pushed by callq), (%rsp)%16==8 should be preserved because 16 bytes alignment should be achived by the following `pushq %rbp & movq %rsp, %rbp`
 
 140454154731520 top
 ...(empty)...

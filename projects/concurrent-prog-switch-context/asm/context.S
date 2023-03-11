@@ -1,19 +1,22 @@
 #ifdef __APPLE__
 
 #define GET_CONTEXT _get_context
-#define SET_CONTEXT _set_context
+#define JUMP_TO_FUNC _jump_to_func
+#define RESTORE_OLD_CONTEXT _restore_old_context
 #define SWITCH_CONTEXT _switch_context
 
 #else
 
 #define GET_CONTEXT get_context
-#define SET_CONTEXT set_context
+#define JUMP_TO_FUNC jump_to_func
+#define RESTORE_OLD_CONTEXT restore_old_context
 #define SWITCH_CONTEXT switch_context
 
 #endif
 
 .global GET_CONTEXT
-.global SET_CONTEXT
+.global JUMP_TO_FUNC
+.global RESTORE_OLD_CONTEXT
 .global SWITCH_CONTEXT
 
 .text
@@ -47,9 +50,9 @@ GET_CONTEXT:
 .text
 .align 4
 
-# restore calee-saved registers
+# jump to a new context of a function, (%rsp)%16==8 after the context switch
 # rdi: first arg `Registers`, rsi: second arg
-SET_CONTEXT:
+JUMP_TO_FUNC:
     xor     %eax, %eax
     inc     %eax            /* Return 1 instead */
 
@@ -61,11 +64,38 @@ SET_CONTEXT:
     movq    32(%rdi), %r14
     movq    40(%rdi), %r15
     movq    48(%rdi), %rdx # rsp in Registers
-    movq    %rdx, %rsp  # configure rsp with the memory in heap
+    movq    %rdx, %rsp  # configure rsp with the memory in heapj
 
-    # addq    $0x8, %rsp  # move stack pointer by one word for pseudo return address
-    # pushq   %rbp    # maybe saving %rbp register for subsequent function entry_point()?
-    # pushq   %rsi
+    /* new stack, (%rsp)%16==0 */
+
+    # pad to achieve 16 bytes alignment in the jumped function
+    addq    $0x8, %rsp
+
+    # movq    56(%rdi), %rdx
+    # jmpq    *%rdx   # jump to entry_point()
+    pushq   56(%rdi)
+    ret
+
+# restore old context, (%rsp)%16==0 after the context switch
+# rdi: first arg `Registers`, rsi: second arg
+RESTORE_OLD_CONTEXT:
+    xor     %eax, %eax
+    inc     %eax            /* Return 1 instead */
+
+    # popq    %rsi
+    movq    (%rdi), %rbx
+    movq    8(%rdi), %rbp
+    movq    16(%rdi), %r12
+    movq    24(%rdi), %r13
+    movq    32(%rdi), %r14
+    movq    40(%rdi), %r15
+    movq    48(%rdi), %rdx # rsp in Registers
+    movq    %rdx, %rsp  # configure rsp with the memory in heapj
+
+    /* new stack, (%rsp)%16==0 */
+
+    # No padding because original context should be keeping 16 bytes alignment
+    # addq    $0x8, %rsp
 
     # movq    56(%rdi), %rdx
     # jmpq    *%rdx   # jump to entry_point()
@@ -98,6 +128,10 @@ SWITCH_CONTEXT:
     movq    40(%rdi), %r15
     movq    48(%rdi), %rdx # rsp in Registers
     movq    %rdx, %rsp  # configure rsp with the memory in heap
+
+    /* new stack, (%rsp)%16==0 */
+
+    addq    $0x8, %rsp # pad to achieve 16 bytes alignment
 
     pushq   56(%rdi) # jump to foo2()
     ret
