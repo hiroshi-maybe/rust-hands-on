@@ -42,13 +42,16 @@ impl Registers {
     pub fn new_with_stack(stack_size: usize, rip: u64) -> Self {
         let layout = Layout::from_size_align(stack_size, get_page_size()).unwrap();
         let stack = unsafe { alloc(layout) };
+
+        let stack_bottom = stack as u64 + stack_size as u64;
         println!(
             "start: {}, end: {}, page size: {}, layout: {:?}",
             stack as u64,
-            stack as u64 + stack_size as u64,
+            stack_bottom,
             get_page_size(),
             layout
         );
+        assert_eq!(stack_bottom % 16, 0);
 
         // Protect stack for potential stack overflow
         unsafe { mprotect(stack as *mut c_void, get_page_size(), ProtFlags::PROT_NONE).unwrap() };
