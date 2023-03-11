@@ -2,8 +2,10 @@
 /// * https://cfsamson.gitbook.io/green-threads-explained-in-200-lines-of-rust/
 mod green;
 
+const STACK_SIZE: usize = 2 * 1024 * 1024;
+
 fn mash() {
-    green::spawn(ortega, 2 * 1024 * 1024);
+    green::spawn(ortega, STACK_SIZE);
     for _ in 0..10 {
         println!("Mash!");
         green::schedule();
@@ -19,7 +21,7 @@ fn ortega() {
 
 fn gaia() {
     println!("Gaia called");
-    green::spawn(mash, 2 * 1024 * 1024);
+    green::spawn(mash, STACK_SIZE);
     for _ in 0..10 {
         println!("Gaia!");
         green::schedule();
@@ -28,5 +30,5 @@ fn gaia() {
 
 fn main() {
     println!("main called");
-    green::spawn_from_main(gaia, 2 * 1024 * 1024);
+    green::spawn_from_main(gaia, STACK_SIZE);
 }

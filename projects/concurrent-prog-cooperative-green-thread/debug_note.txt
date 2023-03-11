@@ -1,3 +1,5 @@
+** regular stack
+
 main called
 create root context from main
 set_context from `spawn_from_main()`
@@ -5,6 +7,8 @@ set_context done: Registers { rbx: 140701871226880, rbp: 140701879610256, r12: 1
 id: 15001850314017541697, page size: 4096, layout: Layout { size_: 2097152, align_: 4096 }
 id: 15001850314017541697, stack top: 140241142808576, stack size: 2097152, stack bottom 140241144905728, entry_point 4469231520
 context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241144905728, rdx: 4469231520 }, stack: 0x7f8c6f800000, stack_layout: Layout { size_: 2097152, align_: 4096 }, entry: 0x10a6337e0, id: 15001850314017541697 }
+
+** stack in heap 1
 
 entry_point() called
 start calling 15001850314017541697
@@ -16,6 +20,12 @@ id: 3131209044456449916, stack top: 140241144909824, stack size: 2097152, stack 
 set_context from `schedule()`
 set_context done: Registers { rbx: 0, rbp: 140241144904656, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241144904176, rdx: 4469231073 }
 context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241147006976, rdx: 4469231520 }, stack: 0x7f8c6fa01000, stack_layout: Layout { size_: 2097152, align_: 4096 }, entry: 0x10a633690, id: 3131209044456449916 }
+
+** stack in heap 2
+
+entry_point() called
+start calling 3131209044456449916
+
 [1]    84294 segmentation fault  cargo run
 
 3131209044456449916: mash()'s ID
@@ -50,3 +60,21 @@ context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r
 
 140701879610256: spawn_from_main's stack pointer at set_context() call
 140701889231760: spawn_from_main's frame pointer
+
+
+===============
+
+-- heap
+
+
+get_id()
+green::spawn()
+gaia()
+gaia's entry_point()
+
+-- stack
+
+
+switch_context
+spawn_from_main
+main

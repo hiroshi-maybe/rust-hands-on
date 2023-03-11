@@ -56,8 +56,13 @@ macro_rules! debug_reg {
     () => {
         let mut reg = Registers::new(0);
         let r = &mut reg as *mut Registers;
-        set_context(r);
+        unsafe {
+            set_context(r);
+        }
         println!("[DEBUG] curent reg: {:?}", reg);
+        unsafe {
+            assert_eq!((*r).rbp % 16, 0);
+        }
     };
 }
 
@@ -103,14 +108,12 @@ impl Context {
 
         let regs = Registers::new(stack as u64 + stack_size as u64);
 
+        let stack_bottom = stack as u64 + stack_size as u64;
         println!(
             "id: {}, stack top: {}, stack size: {}, stack bottom {}, entry_point {}",
-            id,
-            stack as u64,
-            stack_size,
-            stack as u64 + stack_size as u64,
-            entry_point as u64,
+            id, stack as u64, stack_size, stack_bottom, entry_point as u64,
         );
+        assert_eq!(stack_bottom % 16, 0);
 
         Context {
             regs,
@@ -191,9 +194,9 @@ pub fn schedule() {
 #[no_mangle]
 pub extern "C" fn entry_point() {
     println!("entry_point() called");
+    debug_reg!();
     unsafe {
         let ctx = CONTEXTS.front().unwrap();
-        debug_reg!();
         println!("test contains call: {}", (*ID).contains(&ctx.id));
         println!("start calling {}", ctx.id);
         ((**ctx).entry)();
