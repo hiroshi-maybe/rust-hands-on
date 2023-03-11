@@ -11,8 +11,7 @@ mod green;
 
 extern "C" {
     fn get_context(ctx: *mut Registers) -> u64;
-    fn jump_to_func(ctx: *const Registers);
-    fn restore_old_context(ctx: *const Registers);
+    fn set_context(ctx: *const Registers, rsp_pad: u64);
     fn switch_context(ctx1: *const Registers, ctx2: *mut Registers);
 }
 
@@ -46,7 +45,7 @@ fn repeat_context() {
     if volatile.read() == 0 {
         volatile.write(1);
         unsafe {
-            restore_old_context(r);
+            set_context(r, 0);
         }
     }
 }
@@ -65,7 +64,7 @@ fn switch_to_foo() {
     let r = &mut regs as *mut Registers;
 
     unsafe {
-        jump_to_func(r);
+        set_context(r, 8);
     }
 }
 
@@ -141,7 +140,7 @@ fn bar() {
     unsafe {
         if let Some(r1) = &mut REG_MAIN {
             println!("switch to: {:?}", *r1);
-            restore_old_context(&mut **r1 as *mut Registers);
+            set_context(&mut **r1 as *mut Registers, 0);
         }
     }
 }
