@@ -48,7 +48,7 @@ impl Registers {
 
 extern "C" {
     fn set_context(ctx: *mut Registers) -> u64;
-    fn switch_context(ctx: *const Registers) -> !;
+    fn switch_context(ctx: *const Registers, rsp_pad: u64) -> !;
     // fn switch_context2(ctx: *const Registers) -> !;
 }
 
@@ -57,7 +57,8 @@ macro_rules! debug_reg {
         let mut reg = Registers::new(0);
         let r = &mut reg as *mut Registers;
         unsafe {
-            set_context(r);
+            let res = set_context(r);
+            assert_eq!(res, 0);
         }
         println!("[DEBUG] curent reg: {:?}", reg);
         unsafe {
@@ -131,19 +132,24 @@ static mut UNUSED_STACK: (*mut u8, Layout) = (ptr::null_mut(), Layout::new::<u8>
 static mut CONTEXTS: LinkedList<Box<Context>> = LinkedList::new();
 static mut ID: *mut HashSet<u64> = ptr::null_mut();
 
+static mut ID_COUNTER: u64 = 1_000_000_000_000;
 fn get_id() -> u64 {
-    println!("get_id() called");
     loop {
-        let rnd = rand::random::<u64>();
-        println!("id {} generated", rnd);
+        let res = unsafe {
+            ID_COUNTER += 1;
+            ID_COUNTER
+        };
 
-        unsafe {
-            if !(*ID).contains(&rnd) {
-                // <2>
-                (*ID).insert(rnd); // <3>
-                return rnd;
-            };
-        }
+        return res;
+        // let rnd = rand::random::<u64>();
+
+        // unsafe {
+        //     if !(*ID).contains(&rnd) {
+        //         // <2>
+        //         (*ID).insert(rnd); // <3>
+        //         return rnd;
+        //     };
+        // }
 
         // unsafe {
         //     if (*ID).insert(rnd) {
@@ -156,12 +162,12 @@ fn get_id() -> u64 {
 
 pub fn spawn(func: Entry, stack_size: usize) -> u64 {
     unsafe {
-        println!("spawn called");
         let id = get_id();
         println!("[{}] ID generated", id);
         CONTEXTS.push_back(Box::new(Context::new(func, stack_size, id)));
         println!("[{}] spawned", id);
         schedule();
+        println!("schedule() done");
         id
     }
 }
@@ -179,15 +185,21 @@ pub fn schedule() {
 
         println!("set_context from `schedule()`");
         let set_context_res = set_context(regs);
-        println!("set_context done: {:?}", *regs);
         if set_context_res == 0 {
+            println!("set_context done ({:?}): {:?}", set_context_res, *regs);
             let next = CONTEXTS.front().unwrap();
-            println!("context to be switched to: {:?}", next);
+            println!("context switching back to: {:?}", next);
             // switch_context2((**next).get_regs());
-            switch_context((**next).get_regs());
+            switch_context((**next).get_regs(), 8);
+        } else {
+            println!(
+                "jump back to right after set_context() ({:?}): {:?}",
+                set_context_res, *regs
+            );
         }
 
         rm_unused_stack();
+        println!("rm_unused_stack() done");
     }
 }
 
@@ -197,10 +209,7 @@ pub extern "C" fn entry_point() {
     debug_reg!();
     unsafe {
         let ctx = CONTEXTS.front().unwrap();
-        println!("test contains call: {}", (*ID).contains(&ctx.id));
-        println!("start calling {}", ctx.id);
         ((**ctx).entry)();
-        println!("finish calling {}", ctx.id);
 
         let ctx = CONTEXTS.pop_front().unwrap();
 
@@ -210,12 +219,12 @@ pub extern "C" fn entry_point() {
         match CONTEXTS.front() {
             Some(c) => {
                 println!("switching to {}", c.id);
-                switch_context((**c).get_regs());
+                switch_context((**c).get_regs(), 0);
             }
             None => {
                 if let Some(c) = &CTX_MAIN {
                     println!("back to the main root context");
-                    switch_context(&**c as *const Registers);
+                    switch_context(&**c as *const Registers, 0);
                 }
             }
         };
@@ -248,7 +257,7 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
                 CONTEXTS.push_back(Box::new(Context::new(func, stack_size, get_id())));
                 let first = CONTEXTS.front().unwrap();
                 println!("context to be switched to: {:?}", first);
-                switch_context(first.get_regs());
+                switch_context(first.get_regs(), 8);
             }
 
             rm_unused_stack();
@@ -267,6 +276,7 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
 }
 
 unsafe fn rm_unused_stack() {
+    println!("rm_unused_stack() called");
     if UNUSED_STACK.0 != ptr::null_mut() {
         mprotect(
             UNUSED_STACK.0 as *mut c_void,

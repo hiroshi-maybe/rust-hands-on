@@ -1,80 +1,114 @@
-** regular stack
+** regular stack (main)
 
 main called
 create root context from main
 set_context from `spawn_from_main()`
-set_context done: Registers { rbx: 140701871226880, rbp: 140701879610256, r12: 140701871230976, r13: 140704325620928, r14: 4469719936, r15: 140701879610640, rsp: 140701879609504, rdx: 4469233051 }
-id: 15001850314017541697, page size: 4096, layout: Layout { size_: 2097152, align_: 4096 }
-id: 15001850314017541697, stack top: 140241142808576, stack size: 2097152, stack bottom 140241144905728, entry_point 4469231520
-context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241144905728, rdx: 4469231520 }, stack: 0x7f8c6f800000, stack_layout: Layout { size_: 2097152, align_: 4096 }, entry: 0x10a6337e0, id: 15001850314017541697 }
+set_context done: Registers { rbx: 140701927219200, rbp: 140701935602448, r12: 140701935602816, r13: 140701927223296, r14: 140701935602784, r15: 0, rsp: 140701935601648, rdx: 4413214944 }
+id: 1000000000001, page size: 4096, layout: Layout { size: 2097152, align: 4096 (1 << 12) }
+id: 1000000000001, stack top: 140293210898432, stack size: 2097152, stack bottom 140293212995584, entry_point 4413213216
+context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140293212995584, rdx: 4413213216 }, stack: 0x7f988f000000, stack_layout: Layout { size: 2097152, align: 4096 (1 << 12) }, entry: 0x1070c2f90, id: 1000000000001 }
 
-** stack in heap 1
+CONTEXTS: [gaia]
+
+** stack in heap 1 (Gaia)
 
 entry_point() called
-start calling 15001850314017541697
+[DEBUG] curent reg: Registers { rbx: 0, rbp: 140293212995568, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140293212994880, rdx: 4413213314 }
 Gaia called
-id: 3131209044456449916, page size: 4096, layout: Layout { size_: 2097152, align_: 4096 }
-id: 3131209044456449916, stack top: 140241144909824, stack size: 2097152, stack bottom 140241147006976, entry_point 4469231520
-[3131209044456449916] spawned
-[15001850314017541697] set_context being called
-set_context from `schedule()`
-set_context done: Registers { rbx: 0, rbp: 140241144904656, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241144904176, rdx: 4469231073 }
-context to be switched to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140241147006976, rdx: 4469231520 }, stack: 0x7f8c6fa01000, stack_layout: Layout { size_: 2097152, align_: 4096 }, entry: 0x10a633690, id: 3131209044456449916 }
+[1000000000002] ID generated
+id: 1000000000002, page size: 4096, layout: Layout { size: 2097152, align: 4096 (1 << 12) }
+id: 1000000000002, stack top: 140293212999680, stack size: 2097152, stack bottom 140293215096832, entry_point 4413213216
+[1000000000002] spawned
 
-** stack in heap 2
+[1000000000001] set_context being called
+
+CONTEXTS: [mash, gaia]
+
+set_context from `schedule()`
+set_context done (0): Registers { rbx: 0, rbp: 140293212994352, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140293212993808, rdx: 4413212615 }
+context switching back to: Context { regs: Registers { rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140293215096832, rdx: 4413213216 }, stack: 0x7f988f201000, stack_layout: Layout { size: 2097152, align: 4096 (1 << 12) }, entry: 0x1070c2e20, id: 1000000000002 }
+
+** stack in heap 2 (Mash)
 
 entry_point() called
-start calling 3131209044456449916
+[DEBUG] curent reg: Registers { rbx: 0, rbp: 140293215096816, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140293215096128, rdx: 4413213314 }
+Mash called
+[1000000000003] ID generated
+id: 1000000000003, page size: 4096, layout: Layout { size: 2097152, align: 4096 (1 << 12) }
+id: 1000000000003, stack top: 140293215096832, stack size: 2097152, stack bottom 140293217193984, entry_point 4413213216
 
-[1]    84294 segmentation fault  cargo run
+CONTEXTS: [mash, gaia, ortega]
 
-3131209044456449916: mash()'s ID
-15001850314017541697: gaia()'s ID
+[1000000000003] spawned
+[1000000000002] set_context being called
+
+CONTEXTS: [gaia, ortega, mash]
+
+set_context from `schedule()`
+set_context done (0): Registers { rbx: 0, rbp: 140293215095600, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140293215095056, rdx: 4413212615 }
+context switching back to: Context { regs: Registers { rbx: 0, rbp: 140293212994352, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140293212993808, rdx: 4413212615 }, stack: 0x7f988f000000, stack_layout: Layout { size: 2097152, align: 4096 (1 << 12) }, entry: 0x1070c2f90, id: 1000000000001 }
+jump back to right after set_context(): Registers { rbx: 0, rbp: 140293212994352, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140293212993808, rdx: 4413212615 }
+rm_unused_stack() called
+rm_unused_stack() done
+
+[1]    915 bus error  cargo run
 
 -- text
 
-4469231073: gaia's schedule()'s return address for set_context() call
-4469231520: entry_point()
-4469233051: spawn_from_main's return address for set_context() call
+4413212615: gaia's schedule()'s return address for set_context() call
+4413213216: entry_point()
+4413214944: spawn_from_main's return address for set_context() call
 
 -- heap
 
-140241142808576: stack top
+140293210898432: gaia's stack top
 
-140241144904176: gaia's stack pointer
-140241144904656: frame pointer for schedule() call
+(empty)
+
+switch_context (only return address)
+140293212993808: gaia's schedule()'s %rsp
 ...
-140241144905704: return address of switch_context() call
-140241144905712: 0 from context.rbp
-140241144905720: # addq    $0x8, %rsp
-140241144905728: stack bottom
+140293212994352: gaia's schedule()'s %rbp
+...
+140293212994880: gaia's entry_point()'s %rsp
+...
+140293212995568: gaia's entry_point()'s %rbp
+140293212995584: gaia's stack bottom
 
-140241144909824: mash's stack top
 
-140241147006952: return address of switch_context() call
-140241147006960: 0 from context.rbp
-140241147006968: # addq    $0x8, %rsp
-140241147006976: mash's stack bottom
+140293212999680: mash's stack top
+
+
+140293215095056: mash's schedule()'s %rsp
+...
+140293215095600: mash's schedule()'s %rbp
+...
+140293215096128: mash's entry_point()'s %rsp
+...
+140293215096816: mash's entry_point()'s %rbp
+140293215096832: mash's stack bottom
+
+140293215096832: ortega's stack top
+
+140293217193984: ortega's stack bottom
 
 -- stack
 
-140701879610256: spawn_from_main's stack pointer at set_context() call
-140701889231760: spawn_from_main's frame pointer
-
+140701935601648: spawn_from_main's stack pointer at set_context() call
+140701935602448: spawn_from_main's frame pointer
 
 ===============
 
 -- heap
 
 
-get_id()
-green::spawn()
+gaia's schedule()
+gaia's spawn()
 gaia()
 gaia's entry_point()
 
 -- stack
 
-
-switch_context
+switch_context (only return address)
 spawn_from_main
 main

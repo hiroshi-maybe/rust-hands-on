@@ -5,7 +5,9 @@ mod green;
 const STACK_SIZE: usize = 2 * 1024 * 1024;
 
 fn mash() {
+    println!("Mash called");
     green::spawn(ortega, STACK_SIZE);
+    println!("Welcome back to Mash!");
     for _ in 0..10 {
         println!("Mash!");
         green::schedule();
@@ -22,6 +24,7 @@ fn ortega() {
 fn gaia() {
     println!("Gaia called");
     green::spawn(mash, STACK_SIZE);
+    println!("Welcome back to Gaia!");
     for _ in 0..10 {
         println!("Gaia!");
         green::schedule();
