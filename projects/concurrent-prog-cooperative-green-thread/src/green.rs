@@ -60,7 +60,7 @@ macro_rules! debug_reg {
             let res = set_context(r);
             assert_eq!(res, 0);
         }
-        println!("[DEBUG] curent reg: {:?}", reg);
+        // println!("[DEBUG] curent reg: {:?}", reg);
         unsafe {
             assert_eq!((*r).rbp % 16, 0);
         }
@@ -96,12 +96,12 @@ impl Context {
     #[inline(never)]
     fn new(func: Entry, stack_size: usize, id: u64) -> Self {
         let layout = Layout::from_size_align(stack_size, get_page_size()).unwrap();
-        println!(
-            "id: {}, page size: {}, layout: {:?}",
-            id,
-            get_page_size(),
-            layout
-        );
+        // println!(
+        //     "id: {}, page size: {}, layout: {:?}",
+        //     id,
+        //     get_page_size(),
+        //     layout
+        // );
         let stack = unsafe { alloc(layout) };
 
         // Protect stack for potential stack overflow
@@ -110,10 +110,10 @@ impl Context {
         let regs = Registers::new(stack as u64 + stack_size as u64);
 
         let stack_bottom = stack as u64 + stack_size as u64;
-        println!(
-            "id: {}, stack top: {}, stack size: {}, stack bottom {}, entry_point {}",
-            id, stack as u64, stack_size, stack_bottom, entry_point as u64,
-        );
+        // println!(
+        //     "id: {}, stack top: {}, stack size: {}, stack bottom {}, entry_point {}",
+        //     id, stack as u64, stack_size, stack_bottom, entry_point as u64,
+        // );
         assert_eq!(stack_bottom % 16, 0);
 
         Context {
@@ -163,11 +163,11 @@ fn get_id() -> u64 {
 pub fn spawn(func: Entry, stack_size: usize) -> u64 {
     unsafe {
         let id = get_id();
-        println!("[{}] ID generated", id);
+        // println!("[{}] ID generated", id);
         CONTEXTS.push_back(Box::new(Context::new(func, stack_size, id)));
-        println!("[{}] spawned", id);
+        // println!("[{}] spawned", id);
         schedule();
-        println!("schedule() done");
+        // println!("schedule() done");
         id
     }
 }
@@ -180,32 +180,42 @@ pub fn schedule() {
 
         let mut ctx = CONTEXTS.pop_front().unwrap();
         let regs = ctx.get_regs_mut();
-        println!("[{}] set_context being called", ctx.id);
+        // println!("[{}] set_context being called", ctx.id);
         CONTEXTS.push_back(ctx);
 
-        println!("set_context from `schedule()`");
+        // println!("set_context from `schedule()`");
         let set_context_res = set_context(regs);
         if set_context_res == 0 {
-            println!("set_context done ({:?}): {:?}", set_context_res, *regs);
+            // println!("set_context done ({:?}): {:?}", set_context_res, *regs);
             let next = CONTEXTS.front().unwrap();
-            println!("context switching back to: {:?}", next);
+            // println!("context switching back to: {:?}", next);
             // switch_context2((**next).get_regs());
-            switch_context((**next).get_regs(), 8);
-        } else {
-            println!(
-                "jump back to right after set_context() ({:?}): {:?}",
-                set_context_res, *regs
+            let reg = (**next).get_regs();
+            switch_context(
+                reg,
+                if (*reg).rdx == entry_point as u64 {
+                    8
+                } else {
+                    0
+                },
             );
+        } else {
+            // println!(
+            //     "jump back to right after set_context() ({:?}): {:?}",
+            //     set_context_res, *regs
+            // );
         }
 
         rm_unused_stack();
-        println!("rm_unused_stack() done");
+        // println!("rm_unused_stack() done");
     }
+    // println!("schedule() tail");
+    debug_reg!();
 }
 
 #[no_mangle]
 pub extern "C" fn entry_point() {
-    println!("entry_point() called");
+    // println!("entry_point() called");
     debug_reg!();
     unsafe {
         let ctx = CONTEXTS.front().unwrap();
@@ -218,12 +228,12 @@ pub extern "C" fn entry_point() {
 
         match CONTEXTS.front() {
             Some(c) => {
-                println!("switching to {}", c.id);
+                // println!("switching to {}", c.id);
                 switch_context((**c).get_regs(), 0);
             }
             None => {
                 if let Some(c) = &CTX_MAIN {
-                    println!("back to the main root context");
+                    // println!("back to the main root context");
                     switch_context(&**c as *const Registers, 0);
                 }
             }
@@ -238,7 +248,7 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
             panic!("spawn_from_main is called twice");
         }
 
-        println!("create root context from main");
+        // println!("create root context from main");
         CTX_MAIN = Some(Box::new(Registers::new(0)));
         if let Some(ctx) = &mut CTX_MAIN {
             // let mut msgs = MappedList::new();
@@ -250,13 +260,13 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
             let mut ids = HashSet::new();
             ID = &mut ids as *mut HashSet<u64>;
 
-            println!("set_context from `spawn_from_main()`");
+            // println!("set_context from `spawn_from_main()`");
             let set_context_res = set_context(&mut **ctx as *mut Registers);
-            println!("set_context done: {:?}", ctx);
+            // println!("set_context done: {:?}", ctx);
             if set_context_res == 0 {
                 CONTEXTS.push_back(Box::new(Context::new(func, stack_size, get_id())));
                 let first = CONTEXTS.front().unwrap();
-                println!("context to be switched to: {:?}", first);
+                // println!("context to be switched to: {:?}", first);
                 switch_context(first.get_regs(), 8);
             }
 
@@ -276,7 +286,7 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
 }
 
 unsafe fn rm_unused_stack() {
-    println!("rm_unused_stack() called");
+    // println!("rm_unused_stack() called");
     if UNUSED_STACK.0 != ptr::null_mut() {
         mprotect(
             UNUSED_STACK.0 as *mut c_void,

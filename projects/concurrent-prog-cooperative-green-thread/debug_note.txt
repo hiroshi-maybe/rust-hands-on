@@ -50,10 +50,20 @@ context switching back to: Context { regs: Registers { rbx: 0, rbp: 140293212994
 jump back to right after set_context(): Registers { rbx: 0, rbp: 140293212994352, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 140293212993808, rdx: 4413212615 }
 rm_unused_stack() called
 rm_unused_stack() done
+schedule() tail
 
 [1]    915 bus error  cargo run
 
+* thread #1, name = 'main', queue = 'com.apple.main-thread', stop reason = EXC_BAD_ACCESS (code=2, address=0x1004ffc70)
+    frame #0: 0x00000001004ffc70
+->  0x1004ffc70: xorb   %bh, %ch
+    0x1004ffc72: addb   %r8b, (%r9)
+    0x1004ffc75: addb   %al, (%rax)
+    0x1004ffc77: addb   %cl, (%rdi,%rbx,4)
+
 -- text
+
+4300209264 (0x1004ffc70): crashed...
 
 4413212615: gaia's schedule()'s return address for set_context() call
 4413213216: entry_point()
