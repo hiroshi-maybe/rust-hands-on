@@ -212,11 +212,11 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
 
         CTX_MAIN = Some(Box::new(Registers::new(0)));
         if let Some(ctx) = &mut CTX_MAIN {
-            // let mut msgs = MappedList::new();
-            // MESSAGES = &mut msgs as *mut MappedList<u64>;
+            let mut msgs = MappedList::new();
+            MESSAGES = &mut msgs as *mut MappedList<u64>;
 
-            // let mut waiting = HashMap::new();
-            // WAITING = &mut waiting as *mut HashMap<u64, Box<Context>>;
+            let mut waiting = HashMap::new();
+            WAITING = &mut waiting as *mut HashMap<u64, Box<Context>>;
 
             let mut ids = HashSet::new();
             ID = &mut ids as *mut HashSet<u64>;
@@ -232,12 +232,13 @@ pub fn spawn_from_main(func: Entry, stack_size: usize) {
 
             CTX_MAIN = None;
             CONTEXTS.clear();
-            // MESSAGES = ptr::null_mut();
-            // WAITING = ptr::null_mut();
+            MESSAGES = ptr::null_mut();
+            WAITING = ptr::null_mut();
             ID = ptr::null_mut();
 
-            // msgs.clear();
-            // waiting.clear();
+            msgs.clear();
+            waiting.clear();
+
             ids.clear();
         }
     }
@@ -323,14 +324,7 @@ pub fn recv() -> Option<u64> {
         if set_context(regs) == 0 {
             let next = CONTEXTS.front().unwrap();
             let reg = (**next).get_regs();
-            switch_context(
-                reg,
-                if (*reg).rdx == entry_point as u64 {
-                    8
-                } else {
-                    0
-                },
-            );
+            switch_context(reg, 0);
         }
 
         rm_unused_stack();
