@@ -1,7 +1,7 @@
 use nix::sys::mman::{mprotect, ProtFlags};
 use nix::unistd::SysconfVar;
 use std::alloc::{alloc, dealloc, Layout};
-use std::collections::{HashSet, LinkedList};
+use std::collections::{HashMap, HashSet, LinkedList};
 use std::ffi::c_void;
 use std::ptr;
 
@@ -121,6 +121,9 @@ static mut UNUSED_STACK: (*mut u8, Layout) = (ptr::null_mut(), Layout::new::<u8>
 
 static mut CONTEXTS: LinkedList<Box<Context>> = LinkedList::new();
 static mut ID: *mut HashSet<u64> = ptr::null_mut();
+
+static mut MESSAGES: *mut MappedList<u64> = ptr::null_mut();
+static mut WAITING: *mut HashMap<u64, Box<Context>> = ptr::null_mut();
 
 fn get_id() -> u64 {
     loop {
@@ -250,5 +253,87 @@ unsafe fn rm_unused_stack() {
         .unwrap();
         dealloc(UNUSED_STACK.0, UNUSED_STACK.1);
         UNUSED_STACK = (ptr::null_mut(), Layout::new::<u8>());
+    }
+}
+
+struct MappedList<T> {
+    map: HashMap<u64, LinkedList<T>>,
+}
+
+impl<T> MappedList<T> {
+    fn new() -> Self {
+        MappedList {
+            map: HashMap::new(),
+        }
+    }
+
+    fn push_back(&mut self, key: u64, val: T) {
+        if let Some(list) = self.map.get_mut(&key) {
+            list.push_back(val);
+        } else {
+            let mut list = LinkedList::new();
+            list.push_back(val);
+            self.map.insert(key, list);
+        }
+    }
+
+    fn pop_front(&mut self, key: u64) -> Option<T> {
+        if let Some(list) = self.map.get_mut(&key) {
+            let val = list.pop_front();
+            if list.len() == 0 {
+                self.map.remove(&key);
+            }
+            val
+        } else {
+            None
+        }
+    }
+
+    fn clear(&mut self) {
+        self.map.clear();
+    }
+}
+
+pub fn send(key: u64, msg: u64) {
+    unsafe {
+        (*MESSAGES).push_back(key, msg);
+        if let Some(ctx) = (*WAITING).remove(&key) {
+            CONTEXTS.push_back(ctx);
+        }
+    }
+    schedule();
+}
+
+pub fn recv() -> Option<u64> {
+    unsafe {
+        let key = CONTEXTS.front().unwrap().id;
+
+        if let Some(msg) = (*MESSAGES).pop_front(key) {
+            return Some(msg);
+        }
+
+        if CONTEXTS.len() == 1 {
+            panic!("deadlock");
+        }
+
+        let mut ctx = CONTEXTS.pop_front().unwrap();
+        let regs = ctx.get_regs_mut();
+        (*WAITING).insert(key, ctx);
+
+        if set_context(regs) == 0 {
+            let next = CONTEXTS.front().unwrap();
+            let reg = (**next).get_regs();
+            switch_context(
+                reg,
+                if (*reg).rdx == entry_point as u64 {
+                    8
+                } else {
+                    0
+                },
+            );
+        }
+
+        rm_unused_stack();
+        (*MESSAGES).pop_front(key)
     }
 }

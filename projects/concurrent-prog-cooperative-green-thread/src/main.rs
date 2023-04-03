@@ -4,6 +4,7 @@ mod green;
 
 const STACK_SIZE: usize = 2 * 1024 * 1024;
 
+#[allow(dead_code)]
 fn mash() {
     // println!("Mash called");
     green::spawn(ortega, STACK_SIZE);
@@ -14,6 +15,7 @@ fn mash() {
     }
 }
 
+#[allow(dead_code)]
 fn ortega() {
     for _ in 0..10 {
         println!("Ortega!");
@@ -21,6 +23,7 @@ fn ortega() {
     }
 }
 
+#[allow(dead_code)]
 fn gaia() {
     // println!("Gaia called");
     green::spawn(mash, STACK_SIZE);
@@ -31,7 +34,21 @@ fn gaia() {
     }
 }
 
+fn producer() {
+    let id = green::spawn(consumer, STACK_SIZE);
+    for i in 0..10 {
+        green::send(id, i);
+    }
+}
+
+fn consumer() {
+    for _ in 0..10 {
+        let msg = green::recv().unwrap();
+        println!("received: count = {}", msg);
+    }
+}
+
 fn main() {
-    // println!("main called");
-    green::spawn_from_main(gaia, STACK_SIZE);
+    // green::spawn_from_main(gaia, STACK_SIZE);
+    green::spawn_from_main(producer, STACK_SIZE);
 }
