@@ -39,10 +39,12 @@ impl<T> FairLock<T> {
 
         self.waiting[idx].store(true, Ordering::Relaxed);
         loop {
+            // Another thread let the current thread get the turn and take a lock.
             if !self.waiting[idx].load(Ordering::Relaxed) {
                 break;
             }
 
+            // It's not a turn of the current thread, but it attempts to take a lock. Beat other threads in the contention.
             if !self.lock.load(Ordering::Relaxed) {
                 if let Ok(_) = self.lock.compare_exchange_weak(
                     false,
@@ -77,9 +79,11 @@ impl<'a, T> Drop for FairLockGuard<'a, T> {
         };
 
         if fl.waiting[next].load(Ordering::Relaxed) {
+            // A thread for the next turn is waiting. Give the lock!
             fl.turn.store(next, Ordering::Relaxed);
             fl.waiting[next].store(false, Ordering::Release);
         } else {
+            // The thread for the next turn is not waiting. Move the turn and make a contention happen.
             fl.turn.store((next + 1) & MASK, Ordering::Relaxed);
             fl.lock.store(false, Ordering::Release);
         }
