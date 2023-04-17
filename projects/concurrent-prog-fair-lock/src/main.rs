@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{atomic::Ordering, Arc};
 
 mod fair_lock;
 
@@ -28,5 +28,12 @@ fn main() {
         "COUNT = {} (expected = {})",
         *lock.lock(0),
         NUM_LOOP * NUM_THREADS
+    );
+    let contention_cnt = lock.contention_cnt.load(Ordering::Relaxed);
+    // Contention happens in 50-60% of lock attempts
+    println!(
+        "Countention count: {} ({:.2}%)",
+        contention_cnt,
+        (contention_cnt as f64) / ((NUM_LOOP * NUM_THREADS) as f64) * 100.0
     );
 }

@@ -12,6 +12,7 @@ pub struct FairLock<T> {
     lock: AtomicBool,
     turn: AtomicUsize,
     data: UnsafeCell<T>,
+    pub contention_cnt: AtomicUsize,
 }
 
 pub struct FairLockGuard<'a, T> {
@@ -31,6 +32,7 @@ impl<T> FairLock<T> {
             lock: AtomicBool::new(false),
             data: UnsafeCell::new(v),
             turn: AtomicUsize::new(0),
+            contention_cnt: AtomicUsize::new(0),
         }
     }
 
@@ -86,6 +88,7 @@ impl<'a, T> Drop for FairLockGuard<'a, T> {
             // The thread for the next turn is not waiting. Move the turn and make a contention happen.
             fl.turn.store((next + 1) & MASK, Ordering::Relaxed);
             fl.lock.store(false, Ordering::Release);
+            fl.contention_cnt.fetch_add(1, Ordering::Relaxed);
         }
     }
 }
