@@ -1,0 +1,8 @@
+[package]
+name = "too-many-lists"
+version = "0.1.0"
+edition = "2021"
+
+# https://rust-unofficial.github.io/too-many-lists/index.html
+
+[dependencies]
