@@ -145,6 +145,31 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
     }
 }
 
+// Cannot implement Iter safely
+//
+// pub struct Iter<'a, T>(Option<Ref<'a, Node<T>>>);
+// impl<T> List<T> {
+//     pub fn iter(&self) -> Iter<T> {
+//         Iter(self.head.as_ref().map(|node| node.borrow()))
+//     }
+// }
+
+// impl<'a, T> Iterator for Iter<'a, T> {
+//     type Item = Ref<'a, T>;
+//     fn next(&mut self) -> Option<Self::Item> {
+//         self.0.take().map(|old_node| {
+//             let (next, elem) = Ref::map_split(old_node, |node| (&node.next, &node.elem));
+//             self.0 = if next.is_some() {
+//                 Some(Ref::map(next, |next| &**next.as_ref().unwrap()))
+//             } else {
+//                 None
+//             };
+
+//             elem
+//         })
+//     }
+// }
+
 #[cfg(test)]
 mod test {
     use super::List;
