@@ -1,3 +1,5 @@
+/// Raw pointers and unsafe Rust for singly-linked list
+pub mod fifth;
 /// Box to avoid infinitely recursive type
 pub mod first;
 /// RefCell to achieve interior mutability for doubly-linked list
