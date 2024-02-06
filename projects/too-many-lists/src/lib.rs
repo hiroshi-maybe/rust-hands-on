@@ -5,6 +5,7 @@ pub mod first;
 /// RefCell to achieve interior mutability for doubly-linked list
 pub mod fourth;
 pub mod second;
+pub mod silly1;
 /// Doubly linked list
 pub mod sixth;
 /// Rc to share ownerships
