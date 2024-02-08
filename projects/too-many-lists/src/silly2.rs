@@ -51,4 +51,26 @@ mod test {
             })
         })
     }
+
+    #[test]
+    fn cell() {
+        use std::cell::Cell;
+
+        List::push(None, Cell::new(3), |list| {
+            List::push(Some(list), Cell::new(5), |list| {
+                List::push(Some(list), Cell::new(13), |list| {
+                    for val in list.iter() {
+                        val.set(val.get() * 10);
+                    }
+
+                    let mut vals = list.iter();
+                    assert_eq!(vals.next().unwrap().get(), 130);
+                    assert_eq!(vals.next().unwrap().get(), 50);
+                    assert_eq!(vals.next().unwrap().get(), 30);
+                    assert_eq!(vals.next(), None);
+                    assert_eq!(vals.next(), None);
+                })
+            })
+        })
+    }
 }
