@@ -261,4 +261,27 @@ mod test {
         assert_eq!(iter.next_back(), None);
         assert_eq!(iter.next(), None);
     }
+
+    #[test]
+    fn test_basic() {
+        let mut m = List::new();
+        assert_eq!(m.pop_front(), None);
+        assert_eq!(m.pop_back(), None);
+        assert_eq!(m.pop_front(), None);
+        m.push_front(1);
+        assert_eq!(*m.peek_front().unwrap(), 1);
+        assert_eq!(m.pop_front(), Some(1));
+        m.push_back(2);
+        m.push_back(3);
+        // assert_eq!(m.len(), 2);
+        assert_eq!(m.pop_front(), Some(2));
+        assert_eq!(m.pop_front(), Some(3));
+        // assert_eq!(m.len(), 0);
+        assert_eq!(m.pop_front(), None);
+        m.push_back(1);
+        m.push_back(3);
+        m.push_back(5);
+        m.push_back(7);
+        assert_eq!(m.pop_front(), Some(1));
+    }
 }
