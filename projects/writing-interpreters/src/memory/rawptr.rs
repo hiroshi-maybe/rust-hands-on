@@ -10,4 +10,16 @@ impl<T: Sized> RawPtr<T> {
             ptr: unsafe { NonNull::new_unchecked(ptr as *mut T) },
         }
     }
+
+    pub fn as_ptr(self) -> *const T {
+        self.ptr.as_ptr()
+    }
 }
+
+impl<T: Sized> Clone for RawPtr<T> {
+    fn clone(&self) -> Self {
+        RawPtr { ptr: self.ptr }
+    }
+}
+
+impl<T: Sized> Copy for RawPtr<T> {}
