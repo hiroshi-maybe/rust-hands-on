@@ -2,7 +2,7 @@ use std::{cell::UnsafeCell, marker::PhantomData, mem::replace};
 
 use crate::memory::stickyimmix::BLOCK_CAPACITY;
 
-use super::stickyimmix::{AllocError, BumpBlock};
+use super::{AllocError, BumpBlock, SizeClass};
 
 pub struct StickyimmixHeap<H> {
     blocks: UnsafeCell<BlockList>,
@@ -53,18 +53,6 @@ impl<H> StickyimmixHeap<H> {
 
         Ok(space)
     }
-}
-
-/// Object size class.
-/// - Small objects fit inside a line
-/// - Medium objects span more than one line
-/// - Large objects span multiple blocks
-#[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum SizeClass {
-    Small,
-    Medium,
-    Large,
 }
 
 /// A list of blocks as the current block being allocated into and a list

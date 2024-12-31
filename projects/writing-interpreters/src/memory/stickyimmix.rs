@@ -1,6 +1,6 @@
 use std::mem::size_of;
 
-use super::{block::BlockError, Block};
+use super::{Block, BlockError};
 
 pub const BLOCK_SIZE_BITS: usize = 15;
 pub const BLOCK_SIZE: usize = 1 << BLOCK_SIZE_BITS; // 32KB
