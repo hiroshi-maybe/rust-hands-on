@@ -31,6 +31,13 @@ pub struct CellPtr<T: Sized> {
 }
 
 impl<T: Sized> CellPtr<T> {
+    /// Construct a new CellPtr from a ScopedPtr
+    pub fn new_with(source: ScopedPtr<T>) -> CellPtr<T> {
+        CellPtr {
+            inner: Cell::new(RawPtr::new(source.value)),
+        }
+    }
+
     pub fn get<'guard>(&self, guard: &'guard dyn MutatorScope) -> ScopedPtr<'guard, T> {
         ScopedPtr::new(guard, self.inner.get().scoped_ref(guard))
     }

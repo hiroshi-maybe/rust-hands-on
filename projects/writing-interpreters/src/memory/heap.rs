@@ -12,14 +12,14 @@ use super::{
 };
 use super::{Mark, RawPtr};
 
-pub struct StickyimmixHeap<H> {
+pub struct StickyImmixHeap<H> {
     blocks: UnsafeCell<BlockList>,
     _header_type: PhantomData<*const H>,
 }
 
-impl<H> StickyimmixHeap<H> {
+impl<H> StickyImmixHeap<H> {
     pub fn new() -> Self {
-        StickyimmixHeap {
+        StickyImmixHeap {
             blocks: UnsafeCell::new(BlockList::new()),
             _header_type: PhantomData,
         }
@@ -63,7 +63,7 @@ impl<H> StickyimmixHeap<H> {
     }
 }
 
-impl<H: AllocHeader> AllocRaw for StickyimmixHeap<H> {
+impl<H: AllocHeader> AllocRaw for StickyImmixHeap<H> {
     type Header = H;
 
     fn alloc<T>(&self, object: T) -> Result<super::RawPtr<T>, AllocError>
