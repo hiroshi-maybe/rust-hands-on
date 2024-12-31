@@ -54,6 +54,11 @@ impl BumpBlock {
         Ok(block)
     }
 
+    /// Return the size of the hole we're positioned at
+    pub fn current_hole_size(&self) -> usize {
+        self.cursor as usize - self.limit as usize
+    }
+
     pub fn inner_alloc(&mut self, alloc_size: usize) -> Option<*const u8> {
         // Allocated downwards
         let cursor_ptr = self.cursor as usize;
