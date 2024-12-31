@@ -1,6 +1,18 @@
-use std::ptr::NonNull;
+use std::{mem::size_of, ptr::NonNull};
 
-use super::{AllocError, RawPtr};
+use super::{
+    stickyimmix::{BLOCK_CAPACITY, LINE_SIZE},
+    AllocError, RawPtr,
+};
+
+// Object size ranges
+const MAX_ALLOC_SIZE: usize = std::u32::MAX as usize;
+const SMALL_OBJECT_MIN: usize = 1;
+const SMALL_OBJECT_MAX: usize = LINE_SIZE;
+const MEDIUM_OBJECT_MIN: usize = SMALL_OBJECT_MAX + 1;
+const MEDIUM_OBJECT_MAX: usize = BLOCK_CAPACITY;
+const LARGE_OBJECT_MIN: usize = MEDIUM_OBJECT_MAX + 1;
+const LARGE_OBJECT_MAX: usize = MAX_ALLOC_SIZE;
 
 /// A type that describes allocation of an object into a heap space, returning
 /// a bare pointer type on success
@@ -37,6 +49,17 @@ pub enum SizeClass {
     Small,
     Medium,
     Large,
+}
+
+impl SizeClass {
+    pub fn get_for_size(object_size: usize) -> Result<SizeClass, AllocError> {
+        match object_size {
+            SMALL_OBJECT_MIN..=SMALL_OBJECT_MAX => Ok(SizeClass::Small),
+            MEDIUM_OBJECT_MIN..=MEDIUM_OBJECT_MAX => Ok(SizeClass::Medium),
+            LARGE_OBJECT_MIN..=LARGE_OBJECT_MAX => Ok(SizeClass::Large),
+            _ => Err(AllocError::BadRequest),
+        }
+    }
 }
 
 /// Every object is `Allocated` on creation.
@@ -81,4 +104,11 @@ pub trait AllocHeader: Sized {
 
     /// Get the type of the object
     fn type_id(&self) -> Self::TypeId;
+}
+
+/// Return the allocated size of an object as it's size_of::<T>() value rounded
+/// up to a double-word boundary
+pub fn alloc_size_of(object_size: usize) -> usize {
+    let align = size_of::<usize>();
+    (object_size + align - 1) & !(align - 1)
 }

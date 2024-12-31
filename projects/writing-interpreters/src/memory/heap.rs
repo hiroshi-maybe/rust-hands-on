@@ -1,8 +1,16 @@
+use std::mem::size_of;
+use std::ptr::{write, NonNull};
+use std::slice::from_raw_parts_mut;
 use std::{cell::UnsafeCell, marker::PhantomData, mem::replace};
 
 use crate::memory::stickyimmix::BLOCK_CAPACITY;
 
-use super::{AllocError, BumpBlock, SizeClass};
+use super::allocator::{alloc_size_of, ArraySize};
+use super::{
+    allocator::{AllocHeader, AllocRaw},
+    AllocError, BumpBlock, SizeClass,
+};
+use super::{Mark, RawPtr};
 
 pub struct StickyimmixHeap<H> {
     blocks: UnsafeCell<BlockList>,
@@ -52,6 +60,78 @@ impl<H> StickyimmixHeap<H> {
         };
 
         Ok(space)
+    }
+}
+
+impl<H: AllocHeader> AllocRaw for StickyimmixHeap<H> {
+    type Header = H;
+
+    fn alloc<T>(&self, object: T) -> Result<super::RawPtr<T>, AllocError>
+    where
+        T: super::allocator::AllocObject<<Self::Header as AllocHeader>::TypeId>,
+    {
+        // calculate the total size of the object and it's header
+        let header_size = size_of::<Self::Header>();
+        let object_size = size_of::<T>();
+        let total_size = header_size + object_size;
+
+        // round the size to the next word boundary to keep objects aligned and get the size class
+        let alloc_size = alloc_size_of(total_size);
+        let size_class = SizeClass::get_for_size(alloc_size)?;
+
+        let space = self.find_space(alloc_size, size_class)?;
+        let header = Self::Header::new::<T>(object_size as ArraySize, size_class, Mark::Allocated);
+
+        unsafe {
+            write(space as *mut Self::Header, header);
+        }
+
+        let object_space = unsafe { space.offset(header_size as isize) };
+        unsafe {
+            write(object_space as *mut T, object);
+        }
+
+        Ok(RawPtr::new(object_space as *const T))
+    }
+
+    fn alloc_array(
+        &self,
+        size_bytes: super::allocator::ArraySize,
+    ) -> Result<super::RawPtr<u8>, AllocError> {
+        let header_size = size_of::<Self::Header>();
+        let total_size = header_size + size_bytes as usize;
+
+        let alloc_size = alloc_size_of(total_size);
+        let size_class = SizeClass::get_for_size(alloc_size)?;
+
+        let space = self.find_space(alloc_size, size_class)?;
+
+        let header = Self::Header::new_array(size_bytes, size_class, Mark::Allocated);
+
+        unsafe {
+            write(space as *mut Self::Header, header);
+        }
+
+        let array_space = unsafe { space.offset(header_size as isize) };
+
+        // Initialize object_space to zero here.
+        // If using the system allocator for any objects (SizeClass::Large, for example),
+        // the memory may already be zeroed.
+        let array = unsafe { from_raw_parts_mut(array_space as *mut u8, size_bytes as usize) };
+        // The compiler should recognize this as optimizable
+        for byte in array {
+            *byte = 0;
+        }
+
+        Ok(RawPtr::new(array_space as *const u8))
+    }
+
+    fn get_header(object: std::ptr::NonNull<()>) -> std::ptr::NonNull<Self::Header> {
+        unsafe { NonNull::new_unchecked(object.cast::<Self::Header>().as_ptr().offset(-1)) }
+    }
+
+    fn get_object(header: std::ptr::NonNull<Self::Header>) -> std::ptr::NonNull<()> {
+        unsafe { NonNull::new_unchecked(header.as_ptr().offset(1).cast::<()>()) }
     }
 }
 
