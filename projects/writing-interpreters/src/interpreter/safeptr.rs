@@ -2,7 +2,10 @@ use std::cell::Cell;
 
 use crate::memory::RawPtr;
 
-use super::pointerops::ScopedRef;
+use super::{
+    pointerops::ScopedRef,
+    taggedptr::{FatPtr, TaggedPtr, Value},
+};
 
 /// Type that provides a generic anchor for mutator timeslice lifetimes
 pub trait MutatorScope {}
@@ -17,6 +20,12 @@ impl<'guard, T: Sized> ScopedPtr<'guard, T> {
         ScopedPtr { value }
     }
 }
+impl<'guard, T: Sized> Clone for ScopedPtr<'guard, T> {
+    fn clone(&self) -> ScopedPtr<'guard, T> {
+        ScopedPtr { value: self.value }
+    }
+}
+impl<'guard, T: Sized> Copy for ScopedPtr<'guard, T> {}
 
 /// A wrapper around untagged raw pointers for storing compile-time typed pointers in data
 /// structures with interior mutability, allowing pointers to be updated to point at different
@@ -40,5 +49,37 @@ impl<T: Sized> CellPtr<T> {
 
     pub fn get<'guard>(&self, guard: &'guard dyn MutatorScope) -> ScopedPtr<'guard, T> {
         ScopedPtr::new(guard, self.inner.get().scoped_ref(guard))
+    }
+}
+
+/// A _tagged_ runtime typed pointer type with scope limited by `MutatorScope` such that a `Value`
+/// instance can safely be derived and accessed. This type is neccessary to derive `Value`s from.
+#[derive(Copy, Clone)]
+pub struct TaggedScopedPtr<'guard> {
+    ptr: TaggedPtr,
+    value: Value<'guard>,
+}
+
+impl<'guard> TaggedScopedPtr<'guard> {
+    pub fn new(guard: &'guard dyn MutatorScope, ptr: TaggedPtr) -> TaggedScopedPtr<'guard> {
+        TaggedScopedPtr {
+            ptr,
+            value: FatPtr::from(ptr).as_value(guard),
+        }
+    }
+}
+
+/// A wrapper around the runtime typed `TaggedPtr` for storing pointers in data structures with
+/// interior mutability, allowing pointers to be updated to point at different target objects.
+#[derive(Clone)]
+pub struct TaggedCellPtr {
+    inner: Cell<TaggedPtr>,
+}
+
+impl TaggedCellPtr {
+    /// Return the pointer as a `TaggedScopedPtr` type that carries a copy of the `TaggedPtr` and
+    /// a `Value` type for both copying and access convenience
+    pub fn get<'guard>(&self, guard: &'guard dyn MutatorScope) -> TaggedScopedPtr<'guard> {
+        TaggedScopedPtr::new(guard, self.inner.get())
     }
 }

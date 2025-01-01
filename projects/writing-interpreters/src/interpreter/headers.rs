@@ -1,4 +1,19 @@
-use crate::memory::{AllocHeader, AllocTypeId, Mark, SizeClass};
+use crate::memory::{AllocHeader, AllocRaw, AllocTypeId, Mark, RawPtr, SizeClass};
+
+use super::{
+    dict::Dict,
+    function::{Function, Partial},
+    list::List,
+    memory::HeapStorage,
+    number::NumberObject,
+    pair::Pair,
+    pointerops::{AsNonNull, Tagged},
+    symbol::Symbol,
+    taggedptr::FatPtr,
+    text::Text,
+    vm::Upvalue,
+    ArrayU16, ArrayU32, ArrayU8,
+};
 
 /// Recognized heap-allocated types.
 /// This should represent every type native to the runtime with the exception of tagged pointer inline value
@@ -6,7 +21,24 @@ use crate::memory::{AllocHeader, AllocTypeId, Mark, SizeClass};
 #[repr(u16)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TypeList {
+    ArrayBackingBytes,
+    ArrayOpcode,
+    ArrayU8,
+    ArrayU16,
+    ArrayU32,
+    ByteCode,
+    CallFrameList,
+    Dict,
+    Function,
+    InstructionStream,
+    List,
+    NumberObject,
+    Pair,
+    Partial,
+    Symbol,
     Text,
+    Thread,
+    Upvalue,
 }
 
 // Mark this as a Stickyimmix type-identifier type
@@ -19,6 +51,39 @@ pub struct ObjectHeader {
     type_id: TypeList,
     size_bytes: u32,
 }
+
+impl ObjectHeader {
+    /// Convert the ObjectHeader address to a FatPtr pointing at the object itself.
+    // NOTE Any type that is a runtime dynamic type must be added to the below list
+    // NOTE Be careful to match the correct TypeList discriminant with it's corresponding FatPtr discriminant
+    // NOTE Be careful to untag the pointer before putting it into a `FatPtr`
+    // ANCHOR: DefObjectHeaderGetObjectFatPtr
+    pub unsafe fn get_object_fatptr(&self) -> FatPtr {
+        let ptr_to_self = self.non_null_ptr();
+        let object_addr = HeapStorage::get_object(ptr_to_self);
+
+        match self.type_id {
+            TypeList::ArrayU8 => FatPtr::ArrayU8(RawPtr::untag(object_addr.cast::<ArrayU8>())),
+            TypeList::ArrayU16 => FatPtr::ArrayU16(RawPtr::untag(object_addr.cast::<ArrayU16>())),
+            TypeList::ArrayU32 => FatPtr::ArrayU32(RawPtr::untag(object_addr.cast::<ArrayU32>())),
+            TypeList::Dict => FatPtr::Dict(RawPtr::untag(object_addr.cast::<Dict>())),
+            TypeList::Function => FatPtr::Function(RawPtr::untag(object_addr.cast::<Function>())),
+            TypeList::List => FatPtr::List(RawPtr::untag(object_addr.cast::<List>())),
+            TypeList::NumberObject => {
+                FatPtr::NumberObject(RawPtr::untag(object_addr.cast::<NumberObject>()))
+            }
+            TypeList::Pair => FatPtr::Pair(RawPtr::untag(object_addr.cast::<Pair>())),
+            TypeList::Partial => FatPtr::Partial(RawPtr::untag(object_addr.cast::<Partial>())),
+            TypeList::Symbol => FatPtr::Symbol(RawPtr::untag(object_addr.cast::<Symbol>())),
+            TypeList::Text => FatPtr::Text(RawPtr::untag(object_addr.cast::<Text>())),
+            TypeList::Upvalue => FatPtr::Upvalue(RawPtr::untag(object_addr.cast::<Upvalue>())),
+
+            // Other types not represented by FatPtr are an error to id here
+            _ => panic!("Invalid ObjectHeader type tag {:?}!", self.type_id),
+        }
+    }
+}
+impl AsNonNull for ObjectHeader {}
 
 impl AllocHeader for ObjectHeader {
     type TypeId = TypeList;

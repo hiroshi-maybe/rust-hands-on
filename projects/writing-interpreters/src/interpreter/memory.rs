@@ -6,8 +6,9 @@ use super::{
     error::RuntimeError,
     headers::{ObjectHeader, TypeList},
     pointerops::ScopedRef,
-    safeptr::{MutatorScope, ScopedPtr},
+    safeptr::{MutatorScope, ScopedPtr, TaggedScopedPtr},
     symbolmap::SymbolMap,
+    taggedptr::{FatPtr, TaggedPtr},
 };
 
 /// This type describes the mutator's view into memory - the heap and symbol name/ptr lookup.
@@ -33,6 +34,14 @@ impl<'memory> MutatorView<'memory> {
             self.heap.alloc(object)?.scoped_ref(self),
         ))
     }
+
+    pub fn alloc_tagged<T>(&self, object: T) -> Result<TaggedScopedPtr<'_>, RuntimeError>
+    where
+        FatPtr: From<RawPtr<T>>,
+        T: AllocObject<TypeList>,
+    {
+        Ok(TaggedScopedPtr::new(self, self.heap.alloc_tagged(object)?))
+    }
 }
 
 impl<'memory> MutatorScope for MutatorView<'memory> {}
@@ -51,6 +60,14 @@ impl Heap {
         T: AllocObject<TypeList>,
     {
         Ok(self.heap.alloc(object)?)
+    }
+
+    fn alloc_tagged<T>(&self, object: T) -> Result<TaggedPtr, RuntimeError>
+    where
+        FatPtr: From<RawPtr<T>>,
+        T: AllocObject<TypeList>,
+    {
+        Ok(TaggedPtr::from(FatPtr::from(self.heap.alloc(object)?)))
     }
 }
 

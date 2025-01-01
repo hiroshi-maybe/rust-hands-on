@@ -14,6 +14,15 @@ impl<T: Sized> RawPtr<T> {
     pub fn as_ptr(self) -> *const T {
         self.ptr.as_ptr()
     }
+
+    /// Get the pointer value as a word-sized integer
+    pub fn as_word(self) -> usize {
+        self.ptr.as_ptr() as usize
+    }
+
+    pub fn as_untyped(self) -> NonNull<()> {
+        self.ptr.cast()
+    }
 }
 
 impl<T: Sized> Clone for RawPtr<T> {
