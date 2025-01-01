@@ -42,6 +42,10 @@ impl<'memory> MutatorView<'memory> {
     {
         Ok(TaggedScopedPtr::new(self, self.heap.alloc_tagged(object)?))
     }
+
+    pub fn lookup_sym(&self, name: &str) -> TaggedScopedPtr<'_> {
+        TaggedScopedPtr::new(self, self.heap.lookup_sym(name))
+    }
 }
 
 impl<'memory> MutatorScope for MutatorView<'memory> {}
@@ -68,6 +72,10 @@ impl Heap {
         T: AllocObject<TypeList>,
     {
         Ok(TaggedPtr::from(FatPtr::from(self.heap.alloc(object)?)))
+    }
+
+    fn lookup_sym(&self, name: &str) -> TaggedPtr {
+        TaggedPtr::symbol(self.syms.lookup(name))
     }
 }
 
