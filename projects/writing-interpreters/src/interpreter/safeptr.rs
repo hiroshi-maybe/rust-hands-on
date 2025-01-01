@@ -77,9 +77,23 @@ pub struct TaggedCellPtr {
 }
 
 impl TaggedCellPtr {
+    /// Construct a new Nil TaggedCellPtr instance
+    pub fn new_nil() -> TaggedCellPtr {
+        TaggedCellPtr {
+            inner: Cell::new(TaggedPtr::nil()),
+        }
+    }
+
     /// Return the pointer as a `TaggedScopedPtr` type that carries a copy of the `TaggedPtr` and
     /// a `Value` type for both copying and access convenience
     pub fn get<'guard>(&self, guard: &'guard dyn MutatorScope) -> TaggedScopedPtr<'guard> {
         TaggedScopedPtr::new(guard, self.inner.get())
+    }
+
+    /// Set this pointer to point at the same object as a given `TaggedScopedPtr` instance
+    /// The explicit 'guard lifetime bound to MutatorScope is omitted here since the TaggedScopedPtr
+    /// carries this lifetime already so we can assume that this operation is safe
+    pub fn set(&self, source: TaggedScopedPtr) {
+        self.inner.set(TaggedPtr::from(source.ptr))
     }
 }

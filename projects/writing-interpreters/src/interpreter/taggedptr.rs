@@ -96,6 +96,29 @@ impl FatPtr {
     }
 }
 
+/// Implement `From<RawPtr<T>> for FatPtr` for the given FatPtr discriminant and the given `T`
+macro_rules! fatptr_from_rawptr {
+    ($F:tt, $T:ty) => {
+        impl From<RawPtr<$T>> for FatPtr {
+            fn from(ptr: RawPtr<$T>) -> FatPtr {
+                FatPtr::$F(ptr)
+            }
+        }
+    };
+}
+fatptr_from_rawptr!(ArrayU8, ArrayU8);
+fatptr_from_rawptr!(ArrayU16, ArrayU16);
+fatptr_from_rawptr!(ArrayU32, ArrayU32);
+fatptr_from_rawptr!(Dict, Dict);
+fatptr_from_rawptr!(Function, Function);
+fatptr_from_rawptr!(List, List);
+fatptr_from_rawptr!(NumberObject, NumberObject);
+fatptr_from_rawptr!(Pair, Pair);
+fatptr_from_rawptr!(Partial, Partial);
+fatptr_from_rawptr!(Symbol, Symbol);
+fatptr_from_rawptr!(Text, Text);
+fatptr_from_rawptr!(Upvalue, Upvalue);
+
 /// An packed Tagged Pointer which carries type information in the pointers low 2 bits
 #[derive(Copy, Clone)]
 pub union TaggedPtr {

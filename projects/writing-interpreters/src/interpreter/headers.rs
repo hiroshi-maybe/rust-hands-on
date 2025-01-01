@@ -1,4 +1,4 @@
-use crate::memory::{AllocHeader, AllocRaw, AllocTypeId, Mark, RawPtr, SizeClass};
+use crate::memory::{AllocHeader, AllocObject, AllocRaw, AllocTypeId, Mark, RawPtr, SizeClass};
 
 use super::{
     dict::Dict,
@@ -124,3 +124,15 @@ impl AllocHeader for ObjectHeader {
         todo!()
     }
 }
+
+/// Apply the type ID to each native type
+macro_rules! declare_allocobject {
+    ($T:ty, $I:tt) => {
+        impl AllocObject<TypeList> for $T {
+            const TYPE_ID: TypeList = TypeList::$I;
+        }
+    };
+}
+
+declare_allocobject!(Pair, Pair);
+declare_allocobject!(Symbol, Symbol);
