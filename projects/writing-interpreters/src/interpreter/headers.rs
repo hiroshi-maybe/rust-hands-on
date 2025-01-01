@@ -93,7 +93,12 @@ impl AllocHeader for ObjectHeader {
         size_class: SizeClass,
         mark: Mark,
     ) -> Self {
-        todo!()
+        ObjectHeader {
+            mark,
+            size_class,
+            type_id: O::TYPE_ID,
+            size_bytes: size,
+        }
     }
 
     fn new_array(

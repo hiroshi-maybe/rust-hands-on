@@ -1,8 +1,11 @@
-use std::cell::Cell;
+use std::{cell::Cell, fmt};
+
+use crate::interpreter::{taggedptr::Value, ScopedPtr};
 
 use super::{
     error::SourcePos,
-    safeptr::{TaggedCellPtr, TaggedScopedPtr},
+    printer::Print,
+    safeptr::{MutatorScope, TaggedCellPtr, TaggedScopedPtr},
     MutatorView, RuntimeError,
 };
 
@@ -51,7 +54,55 @@ impl Pair {
         Ok(pair)
     }
 
+    pub fn set_first_source_code_pos(&self, pos: SourcePos) {
+        self.first_pos.set(Some(pos));
+    }
+
+    pub fn set_second_source_code_pos(&self, pos: SourcePos) {
+        self.second_pos.set(Some(pos));
+    }
+
     pub fn dot<'guard>(&self, value: TaggedScopedPtr<'guard>) {
         self.second.set(value);
+    }
+}
+
+impl Print for Pair {
+    fn print<'guard>(
+        &self,
+        guard: &'guard dyn MutatorScope,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
+        let mut tail = ScopedPtr::new(guard, self);
+
+        write!(f, "({}", tail.first.get(guard))?;
+
+        while let Value::Pair(next) = *tail.second.get(guard) {
+            tail = next;
+            write!(f, " {}", tail.first.get(guard))?;
+        }
+
+        // clunky way to print anything but nil
+        let second = *tail.second.get(guard);
+        match second {
+            Value::Nil => (),
+            _ => write!(f, " . {}", second)?,
+        }
+
+        write!(f, ")")
+    }
+
+    // In debug print, use dot notation
+    fn debug<'guard>(
+        &self,
+        guard: &'guard dyn MutatorScope,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
+        write!(
+            f,
+            "({:?} . {:?})",
+            self.first.get(guard),
+            self.second.get(guard)
+        )
     }
 }

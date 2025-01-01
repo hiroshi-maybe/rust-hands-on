@@ -35,6 +35,7 @@ impl<'memory> MutatorView<'memory> {
         ))
     }
 
+    /// Write an object into the heap and return a scope-limited runtime-tagged pointer to it
     pub fn alloc_tagged<T>(&self, object: T) -> Result<TaggedScopedPtr<'_>, RuntimeError>
     where
         FatPtr: From<RawPtr<T>>,
@@ -43,8 +44,14 @@ impl<'memory> MutatorView<'memory> {
         Ok(TaggedScopedPtr::new(self, self.heap.alloc_tagged(object)?))
     }
 
+    /// Get a Symbol pointer from its name
     pub fn lookup_sym(&self, name: &str) -> TaggedScopedPtr<'_> {
         TaggedScopedPtr::new(self, self.heap.lookup_sym(name))
+    }
+
+    /// Return a nil-initialized runtime-tagged pointer
+    pub fn nil(&self) -> TaggedScopedPtr<'_> {
+        TaggedScopedPtr::new(self, TaggedPtr::nil())
     }
 }
 
@@ -59,6 +66,13 @@ struct Heap {
 }
 
 impl Heap {
+    fn new() -> Heap {
+        Heap {
+            heap: HeapStorage::new(),
+            syms: SymbolMap::new(),
+        }
+    }
+
     fn alloc<T>(&self, object: T) -> Result<RawPtr<T>, RuntimeError>
     where
         T: AllocObject<TypeList>,
@@ -85,6 +99,11 @@ pub struct Memory {
 }
 
 impl Memory {
+    /// Instantiate a new memory environment
+    pub fn new() -> Memory {
+        Memory { heap: Heap::new() }
+    }
+
     pub fn mutate<M: Mutator>(&self, m: &M, input: M::Input) -> Result<M::Output, RuntimeError> {
         let mut guard = MutatorView::new(self);
         m.run(&mut guard, input)

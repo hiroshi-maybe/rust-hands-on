@@ -1,4 +1,4 @@
-use std::ptr::NonNull;
+use std::{fmt, ptr::NonNull};
 
 use crate::memory::{AllocRaw, RawPtr};
 
@@ -10,6 +10,7 @@ use super::{
     number::NumberObject,
     pair::Pair,
     pointerops::{get_tag, ScopedRef, Tagged, TAG_NUMBER, TAG_OBJECT, TAG_PAIR, TAG_SYMBOL},
+    printer::Print,
     safeptr::MutatorScope,
     symbol::Symbol,
     text::Text,
@@ -36,6 +37,51 @@ pub enum Value<'guard> {
     Symbol(ScopedPtr<'guard, Symbol>),
     Text(ScopedPtr<'guard, Text>),
     Upvalue(ScopedPtr<'guard, Upvalue>),
+}
+
+impl<'guard> MutatorScope for Value<'guard> {}
+
+/// `Value` can have a safe `Display` implementation
+impl<'guard> fmt::Display for Value<'guard> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Value::Nil => write!(f, "nil"),
+            Value::Pair(p) => p.print(self, f),
+            Value::Symbol(s) => s.print(self, f),
+            Value::Number(n) => write!(f, "{}", *n),
+            Value::Text(t) => t.print(self, f),
+            Value::List(a) => a.print(self, f),
+            Value::ArrayU8(a) => a.print(self, f),
+            Value::ArrayU16(a) => a.print(self, f),
+            Value::ArrayU32(a) => a.print(self, f),
+            Value::Dict(d) => d.print(self, f),
+            Value::Function(n) => n.print(self, f),
+            Value::Partial(p) => p.print(self, f),
+            Value::Upvalue(_) => write!(f, "Upvalue"),
+            _ => write!(f, "<unidentified-object-type>"),
+        }
+    }
+}
+
+impl<'guard> fmt::Debug for Value<'guard> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Value::ArrayU8(a) => a.debug(self, f),
+            Value::ArrayU16(a) => a.debug(self, f),
+            Value::ArrayU32(a) => a.debug(self, f),
+            Value::Dict(d) => d.debug(self, f),
+            Value::Function(n) => n.debug(self, f),
+            Value::List(a) => a.debug(self, f),
+            Value::Nil => write!(f, "nil"),
+            Value::Number(n) => write!(f, "{}", *n),
+            Value::Pair(p) => p.debug(self, f),
+            Value::Partial(p) => p.debug(self, f),
+            Value::Symbol(s) => s.debug(self, f),
+            Value::Text(t) => t.debug(self, f),
+            Value::Upvalue(_) => write!(f, "Upvalue"),
+            _ => write!(f, "<unidentified-object-type>"),
+        }
+    }
 }
 
 /// An unpacked tagged Fat Pointer that carries the type information in the enum structure.

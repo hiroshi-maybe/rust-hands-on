@@ -16,6 +16,13 @@ pub struct SymbolMap {
 }
 
 impl SymbolMap {
+    pub fn new() -> SymbolMap {
+        SymbolMap {
+            map: RefCell::new(HashMap::new()),
+            arena: Arena::new(),
+        }
+    }
+
     pub fn lookup(&self, name: &str) -> RawPtr<Symbol> {
         {
             if let Some(ptr) = self.map.borrow().get(name) {

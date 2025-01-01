@@ -1,8 +1,8 @@
-use std::cell::Cell;
+use std::{cell::Cell, fmt};
 
 use crate::memory::ArraySize;
 
-use super::rawarray::RawArray;
+use super::{printer::Print, rawarray::RawArray, safeptr::MutatorScope};
 
 /// An array, like Vec, but applying an interior mutability pattern.
 ///
@@ -23,3 +23,33 @@ pub type ArrayU8 = Array<u8>;
 pub type ArrayU16 = Array<u16>;
 /// Array of u32
 pub type ArrayU32 = Array<u32>;
+
+impl Print for ArrayU8 {
+    fn print<'guard>(
+        &self,
+        _guard: &'guard dyn MutatorScope,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
+        write!(f, "ArrayU8[...]")
+    }
+}
+
+impl Print for ArrayU16 {
+    fn print<'guard>(
+        &self,
+        _guard: &'guard dyn MutatorScope,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
+        write!(f, "ArrayU16[...]")
+    }
+}
+
+impl Print for ArrayU32 {
+    fn print<'guard>(
+        &self,
+        _guard: &'guard dyn MutatorScope,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
+        write!(f, "ArrayU32[...]")
+    }
+}

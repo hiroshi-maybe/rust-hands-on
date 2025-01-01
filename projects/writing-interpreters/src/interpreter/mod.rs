@@ -11,6 +11,7 @@ pub mod number;
 pub mod pair;
 pub mod parser;
 pub mod pointerops;
+pub mod printer;
 pub mod rawarray;
 pub mod safeptr;
 pub mod symbol;

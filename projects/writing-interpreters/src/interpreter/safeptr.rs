@@ -1,9 +1,10 @@
-use std::cell::Cell;
+use std::{cell::Cell, fmt, ops::Deref};
 
 use crate::memory::RawPtr;
 
 use super::{
     pointerops::ScopedRef,
+    printer::Print,
     taggedptr::{FatPtr, TaggedPtr, Value},
 };
 
@@ -26,6 +27,29 @@ impl<'guard, T: Sized> Clone for ScopedPtr<'guard, T> {
     }
 }
 impl<'guard, T: Sized> Copy for ScopedPtr<'guard, T> {}
+
+impl<'guard, T: Sized> Deref for ScopedPtr<'guard, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.value
+    }
+}
+
+impl<'guard, T: Sized + Print> fmt::Display for ScopedPtr<'guard, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.value.print(self, f)
+    }
+}
+
+impl<'guard, T: Sized + Print> fmt::Debug for ScopedPtr<'guard, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.value.print(self, f)
+    }
+}
+
+/// Anything that _has_ a scope lifetime can pass as a scope representation
+impl<'scope, T: Sized> MutatorScope for ScopedPtr<'scope, T> {}
 
 /// A wrapper around untagged raw pointers for storing compile-time typed pointers in data
 /// structures with interior mutability, allowing pointers to be updated to point at different
@@ -69,6 +93,26 @@ impl<'guard> TaggedScopedPtr<'guard> {
     }
 }
 
+impl<'guard> Deref for TaggedScopedPtr<'guard> {
+    type Target = Value<'guard>;
+
+    fn deref(&self) -> &Value<'guard> {
+        &self.value
+    }
+}
+
+impl<'guard> fmt::Display for TaggedScopedPtr<'guard> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
+impl<'guard> fmt::Debug for TaggedScopedPtr<'guard> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
 /// A wrapper around the runtime typed `TaggedPtr` for storing pointers in data structures with
 /// interior mutability, allowing pointers to be updated to point at different target objects.
 #[derive(Clone)]
@@ -95,5 +139,10 @@ impl TaggedCellPtr {
     /// carries this lifetime already so we can assume that this operation is safe
     pub fn set(&self, source: TaggedScopedPtr) {
         self.inner.set(TaggedPtr::from(source.ptr))
+    }
+
+    /// Take the pointer of another `TaggedCellPtr` and set this instance to point at that object too
+    pub fn copy_from(&self, other: &TaggedCellPtr) {
+        self.inner.set(other.inner.get());
     }
 }

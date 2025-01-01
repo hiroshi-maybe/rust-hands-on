@@ -1,6 +1,8 @@
+use std::fmt;
 use std::slice;
 use std::str;
 
+use super::printer::Print;
 use super::safeptr::MutatorScope;
 
 /// A Symbol is a unique object that has a unique name string. The backing storage for the
@@ -28,5 +30,16 @@ impl Symbol {
 
     pub fn as_str<'guard>(&self, _guard: &'guard dyn MutatorScope) -> &'guard str {
         unsafe { &self.unguarded_as_str() }
+    }
+}
+
+impl Print for Symbol {
+    /// Safe because the lifetime of `MutatorScope` defines a safe-access window
+    fn print<'guard>(
+        &self,
+        guard: &'guard dyn MutatorScope,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
+        write!(f, "{}", self.as_str(guard))
     }
 }

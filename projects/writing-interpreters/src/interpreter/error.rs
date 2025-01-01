@@ -5,6 +5,7 @@ pub enum ErrorKind {
     OutOfMemory,
     BadAllocationRequest,
     LexerError(String),
+    ParseError(String),
 }
 
 /// Source code position
@@ -58,4 +59,14 @@ impl From<AllocError> for RuntimeError {
 /// Convenience shorthand function for building a lexer error
 pub fn err_lexer(pos: SourcePos, reason: &str) -> RuntimeError {
     RuntimeError::with_pos(ErrorKind::LexerError(String::from(reason)), pos)
+}
+
+/// Convenience shorthand function for building a parser error
+pub fn err_parser(reason: &str) -> RuntimeError {
+    RuntimeError::new(ErrorKind::ParseError(String::from(reason)))
+}
+
+/// Convenience shorthand function for building a parser error including a source position
+pub fn err_parser_wpos(pos: SourcePos, reason: &str) -> RuntimeError {
+    RuntimeError::with_pos(ErrorKind::ParseError(String::from(reason)), pos)
 }

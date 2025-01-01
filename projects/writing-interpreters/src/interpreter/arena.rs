@@ -63,6 +63,14 @@ pub struct Arena {
     heap: StickyImmixHeap<ArenaHeader>,
 }
 
+impl Arena {
+    pub fn new() -> Arena {
+        Arena {
+            heap: StickyImmixHeap::new(),
+        }
+    }
+}
+
 impl AllocRaw for Arena {
     type Header = ArenaHeader;
 
