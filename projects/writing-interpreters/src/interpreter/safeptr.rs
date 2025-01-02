@@ -74,6 +74,12 @@ impl<T: Sized> CellPtr<T> {
     pub fn get<'guard>(&self, guard: &'guard dyn MutatorScope) -> ScopedPtr<'guard, T> {
         ScopedPtr::new(guard, self.inner.get().scoped_ref(guard))
     }
+
+    // the explicit 'guard lifetime bound to MutatorScope is omitted here since the ScopedPtr
+    // carries this lifetime already so we can assume that this operation is safe
+    pub fn set(&self, source: ScopedPtr<T>) {
+        self.inner.set(RawPtr::new(source.value))
+    }
 }
 
 /// A _tagged_ runtime typed pointer type with scope limited by `MutatorScope` such that a `Value`
@@ -125,6 +131,13 @@ impl TaggedCellPtr {
     pub fn new_nil() -> TaggedCellPtr {
         TaggedCellPtr {
             inner: Cell::new(TaggedPtr::nil()),
+        }
+    }
+
+    /// Construct a new TaggedCellPtr from a TaggedScopedPtr
+    pub fn new_with(source: TaggedScopedPtr) -> TaggedCellPtr {
+        TaggedCellPtr {
+            inner: Cell::new(TaggedPtr::from(source.ptr)),
         }
     }
 

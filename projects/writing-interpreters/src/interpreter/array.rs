@@ -3,11 +3,11 @@ use std::{cell::Cell, fmt, ptr::read, ptr::write};
 use crate::memory::{AllocObject, ArraySize};
 
 use super::{
-    containers::{Container, StackContainer},
+    containers::{Container, IndexedContainer, StackAnyContainer, StackContainer},
     error::ErrorKind,
     printer::Print,
     rawarray::{default_array_growth, RawArray, DEFAULT_ARRAY_SIZE},
-    safeptr::MutatorScope,
+    safeptr::{MutatorScope, TaggedCellPtr, TaggedScopedPtr},
     MutatorView, RuntimeError, ScopedPtr, TypeList,
 };
 
@@ -187,6 +187,54 @@ impl<T: Sized + Clone> StackContainer<T> for Array<T> {
             let item = self.read(guard, last)?;
             Ok(item)
         }
+    }
+}
+
+impl<T: Sized + Clone> IndexedContainer<T> for Array<T> {
+    fn get<'guard>(
+        &self,
+        guard: &'guard dyn MutatorScope,
+        index: ArraySize,
+    ) -> Result<T, RuntimeError> {
+        self.read(guard, index)
+    }
+
+    fn set<'guard>(
+        &self,
+        guard: &'guard dyn MutatorScope,
+        index: ArraySize,
+        item: T,
+    ) -> Result<(), RuntimeError> {
+        self.write(guard, index, item)?;
+        Ok(())
+    }
+}
+
+impl StackAnyContainer for Array<TaggedCellPtr> {
+    /// Push can trigger an underlying array resize, hence it requires the ability to allocate    
+    fn push<'guard>(
+        &self,
+        mem: &'guard MutatorView,
+        item: TaggedScopedPtr<'guard>,
+    ) -> Result<(), RuntimeError> {
+        StackContainer::<TaggedCellPtr>::push(self, mem, TaggedCellPtr::new_with(item))
+    }
+
+    /// Pop returns None if the container is empty, otherwise moves the last item of the array
+    /// out to the caller.
+    fn pop<'guard>(
+        &self,
+        guard: &'guard dyn MutatorScope,
+    ) -> Result<TaggedScopedPtr<'guard>, RuntimeError> {
+        Ok(StackContainer::<TaggedCellPtr>::pop(self, guard)?.get(guard))
+    }
+
+    /// Return the value at the top of the stack without removing it
+    fn top<'guard>(
+        &self,
+        guard: &'guard dyn MutatorScope,
+    ) -> Result<TaggedScopedPtr<'guard>, RuntimeError> {
+        Ok(StackContainer::<TaggedCellPtr>::top(self, guard)?.get(guard))
     }
 }
 

@@ -8,6 +8,7 @@ pub enum ErrorKind {
     ParseError(String),
     MutableBorrowError,
     BoundsError,
+    EvalError(String),
 }
 
 /// Source code position
@@ -71,4 +72,9 @@ pub fn err_parser(reason: &str) -> RuntimeError {
 /// Convenience shorthand function for building a parser error including a source position
 pub fn err_parser_wpos(pos: SourcePos, reason: &str) -> RuntimeError {
     RuntimeError::with_pos(ErrorKind::ParseError(String::from(reason)), pos)
+}
+
+/// Convenience shorthand function for building an evaluation error
+pub fn err_eval(reason: &str) -> RuntimeError {
+    RuntimeError::new(ErrorKind::EvalError(String::from(reason)))
 }

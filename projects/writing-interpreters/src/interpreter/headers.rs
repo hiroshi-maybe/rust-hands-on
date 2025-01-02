@@ -1,6 +1,7 @@
 use crate::memory::{AllocHeader, AllocObject, AllocRaw, AllocTypeId, Mark, RawPtr, SizeClass};
 
 use super::{
+    bytecode::ByteCode,
     dict::Dict,
     function::{Function, Partial},
     list::List,
@@ -139,5 +140,6 @@ macro_rules! declare_allocobject {
     };
 }
 
+declare_allocobject!(ByteCode, ByteCode);
 declare_allocobject!(Pair, Pair);
 declare_allocobject!(Symbol, Symbol);
