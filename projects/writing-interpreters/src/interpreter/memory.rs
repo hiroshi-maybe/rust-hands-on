@@ -1,4 +1,4 @@
-use crate::memory::{allocator::AllocObject, AllocRaw, RawPtr, StickyImmixHeap};
+use crate::memory::{allocator::AllocObject, AllocRaw, ArraySize, RawPtr, StickyImmixHeap};
 
 // GC and Rust: https://blog.pnkfx.org/blog/categories/gc/
 
@@ -42,6 +42,11 @@ impl<'memory> MutatorView<'memory> {
         T: AllocObject<TypeList>,
     {
         Ok(TaggedScopedPtr::new(self, self.heap.alloc_tagged(object)?))
+    }
+
+    /// Make space for an array of bytes
+    pub fn alloc_array(&self, capacity: ArraySize) -> Result<RawPtr<u8>, RuntimeError> {
+        self.heap.alloc_array(capacity)
     }
 
     /// Get a Symbol pointer from its name
@@ -90,6 +95,10 @@ impl Heap {
 
     fn lookup_sym(&self, name: &str) -> TaggedPtr {
         TaggedPtr::symbol(self.syms.lookup(name))
+    }
+
+    fn alloc_array(&self, capacity: ArraySize) -> Result<RawPtr<u8>, RuntimeError> {
+        Ok(self.heap.alloc_array(capacity)?)
     }
 }
 
