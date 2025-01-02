@@ -6,6 +6,8 @@ pub enum ErrorKind {
     BadAllocationRequest,
     LexerError(String),
     ParseError(String),
+    MutableBorrowError,
+    BoundsError,
 }
 
 /// Source code position

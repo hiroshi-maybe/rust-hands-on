@@ -1,5 +1,6 @@
 pub mod arena;
 pub mod array;
+pub mod containers;
 pub mod dict;
 pub mod error;
 pub mod function;

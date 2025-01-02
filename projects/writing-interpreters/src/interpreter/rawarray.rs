@@ -4,6 +4,20 @@ use crate::memory::ArraySize;
 
 use super::{error::ErrorKind, MutatorView, RuntimeError};
 
+/// Arrays start out at this size by default
+pub const DEFAULT_ARRAY_SIZE: ArraySize = 8;
+
+/// Arrays grow at this rate by default
+pub fn default_array_growth(capacity: ArraySize) -> Result<ArraySize, RuntimeError> {
+    if capacity == 0 {
+        Ok(DEFAULT_ARRAY_SIZE)
+    } else {
+        capacity
+            .checked_add(capacity / 2)
+            .ok_or(RuntimeError::new(ErrorKind::BadAllocationRequest))
+    }
+}
+
 /// Fundamental array type on which other variable-length types are built.
 /// Analagous to RawVec.
 pub struct RawArray<T: Sized> {
