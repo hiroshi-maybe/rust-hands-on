@@ -9,6 +9,8 @@ pub enum ErrorKind {
     MutableBorrowError,
     BoundsError,
     EvalError(String),
+    UnhashableError,
+    KeyError,
 }
 
 /// Source code position

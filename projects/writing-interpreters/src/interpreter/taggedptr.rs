@@ -180,6 +180,11 @@ impl TaggedPtr {
         TaggedPtr { tag: 0 }
     }
 
+    /// Return true if the pointer is nil
+    pub fn is_nil(&self) -> bool {
+        unsafe { self.tag == 0 }
+    }
+
     pub fn number(value: isize) -> TaggedPtr {
         TaggedPtr {
             number: (((value as usize) << 2) | TAG_NUMBER) as isize,

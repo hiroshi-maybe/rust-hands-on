@@ -5,6 +5,7 @@ pub mod containers;
 pub mod dict;
 pub mod error;
 pub mod function;
+pub mod hashable;
 pub mod headers;
 pub mod lexer;
 pub mod list;

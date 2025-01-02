@@ -158,4 +158,14 @@ impl TaggedCellPtr {
     pub fn copy_from(&self, other: &TaggedCellPtr) {
         self.inner.set(other.inner.get());
     }
+
+    /// Return true if the pointer is nil
+    pub fn is_nil(&self) -> bool {
+        self.inner.get().is_nil()
+    }
+
+    /// Set this pointer to nil
+    pub fn set_to_nil(&self) {
+        self.inner.set(TaggedPtr::nil())
+    }
 }

@@ -1,7 +1,10 @@
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::slice;
 use std::str;
 
+use super::hashable::Hashable;
 use super::printer::Print;
 use super::safeptr::MutatorScope;
 
@@ -30,6 +33,12 @@ impl Symbol {
 
     pub fn as_str<'guard>(&self, _guard: &'guard dyn MutatorScope) -> &'guard str {
         unsafe { &self.unguarded_as_str() }
+    }
+}
+
+impl Hashable for Symbol {
+    fn hash<'guard, H: Hasher>(&self, guard: &'guard dyn MutatorScope, h: &mut H) {
+        self.as_str(guard).hash(h)
     }
 }
 
