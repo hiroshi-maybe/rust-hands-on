@@ -1,9 +1,17 @@
-use std::{cell::Cell, fmt, ptr::read, ptr::write};
+use std::{
+    cell::Cell,
+    fmt,
+    ptr::{read, write},
+    slice::from_raw_parts_mut,
+};
 
 use crate::memory::{AllocObject, ArraySize};
 
 use super::{
-    containers::{Container, IndexedContainer, StackAnyContainer, StackContainer},
+    containers::{
+        Container, IndexedAnyContainer, IndexedContainer, SliceableContainer, StackAnyContainer,
+        StackContainer,
+    },
     error::ErrorKind,
     printer::Print,
     rawarray::{default_array_growth, RawArray, DEFAULT_ARRAY_SIZE},
@@ -38,6 +46,17 @@ impl<T: Sized + Clone> Array<T> {
         Array<T>: AllocObject<TypeList>,
     {
         mem.alloc(Array::new())
+    }
+
+    /// Allocate a new instance on the heap with pre-allocated capacity
+    pub fn alloc_with_capacity<'guard>(
+        mem: &'guard MutatorView,
+        capacity: ArraySize,
+    ) -> Result<ScopedPtr<'guard, Array<T>>, RuntimeError>
+    where
+        Array<T>: AllocObject<TypeList>,
+    {
+        mem.alloc(Array::with_capacity(mem, capacity)?)
     }
 
     /// Return a bounds-checked pointer to the object at the given index    
@@ -92,6 +111,18 @@ impl<T: Sized + Clone> Array<T> {
             let dest = self.get_offset(index)?;
             write(dest, item);
             Ok(&*dest as &T)
+        }
+    }
+
+    /// Represent the array as a slice. This is necessarily unsafe even for the 'guard lifetime
+    /// duration because while a slice is held, other code can cause array internals to change
+    /// that might cause the slice pointer and length to become invalid. Interior mutability
+    /// patterns such as RefCell-style should be used in addition.
+    pub unsafe fn as_slice<'guard>(&self, _guard: &'guard dyn MutatorScope) -> &mut [T] {
+        if let Some(ptr) = self.data.get().as_ptr() {
+            from_raw_parts_mut(ptr as *mut T, self.length.get() as usize)
+        } else {
+            &mut []
         }
     }
 }
@@ -238,6 +269,19 @@ impl StackAnyContainer for Array<TaggedCellPtr> {
     }
 }
 
+impl<T: Sized + Clone> SliceableContainer<T> for Array<T> {
+    fn access_slice<'guard, F, R>(&self, guard: &'guard dyn MutatorScope, f: F) -> R
+    where
+        F: FnOnce(&mut [T]) -> R,
+    {
+        self.borrow.set(EXPOSED_MUTABLY);
+        let slice = unsafe { self.as_slice(guard) };
+        let result = f(slice);
+        self.borrow.set(INTERIOR_ONLY);
+        result
+    }
+}
+
 /// Array of u8
 pub type ArrayU8 = Array<u8>;
 /// Array of u16
@@ -272,5 +316,27 @@ impl Print for ArrayU32 {
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
         write!(f, "ArrayU32[...]")
+    }
+}
+
+impl IndexedAnyContainer for Array<TaggedCellPtr> {
+    /// Return a pointer to the object at the given index. Bounds-checked.
+    fn get<'guard>(
+        &self,
+        guard: &'guard dyn MutatorScope,
+        index: ArraySize,
+    ) -> Result<TaggedScopedPtr<'guard>, RuntimeError> {
+        Ok(self.read_ref(guard, index)?.get(guard))
+    }
+
+    /// Set the object pointer at the given index. Bounds-checked.
+    fn set<'guard>(
+        &self,
+        guard: &'guard dyn MutatorScope,
+        index: ArraySize,
+        item: TaggedScopedPtr<'guard>,
+    ) -> Result<(), RuntimeError> {
+        self.read_ref(guard, index)?.set(item);
+        Ok(())
     }
 }

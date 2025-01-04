@@ -258,3 +258,10 @@ impl From<FatPtr> for TaggedPtr {
         }
     }
 }
+
+/// Simple identity equality
+impl PartialEq for TaggedPtr {
+    fn eq(&self, other: &TaggedPtr) -> bool {
+        unsafe { self.tag == other.tag }
+    }
+}

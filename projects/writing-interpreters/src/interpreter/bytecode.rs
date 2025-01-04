@@ -8,6 +8,7 @@ use super::{
     error::err_eval,
     list::List,
     safeptr::{MutatorScope, TaggedScopedPtr},
+    taggedptr::TaggedPtr,
     CellPtr, MutatorView, RuntimeError, ScopedPtr,
 };
 
@@ -18,6 +19,9 @@ pub type Register = u8;
 pub type LiteralId = u16;
 
 type LiteralInteger = i16;
+
+/// Upvalues are stored in a list on a Partial, an UpvalueId is the index into the list
+pub type UpvalueId = u8;
 
 /// An instruction jump target is a signed integer, relative to the jump instruction
 pub type JumpOffset = i16;
@@ -102,7 +106,7 @@ impl ByteCode {
 
 // 4 bytes (1 byte enum tag + 3 bytes of data)
 #[derive(Copy, Clone)]
-enum Opcode {
+pub enum Opcode {
     Add {
         // 3 bytes
         dest: Register,
@@ -124,6 +128,23 @@ enum Opcode {
     JumpIfNotTrue {
         test: Register,
         offset: JumpOffset,
+    },
+    MakeClosure {
+        dest: Register,
+        function: Register,
+    },
+    GetUpvalue {
+        dest: Register,
+        src: UpvalueId,
+    },
+    SetUpvalue {
+        dest: UpvalueId,
+        src: Register,
+    },
+    CloseUpvalues {
+        reg1: Register,
+        reg2: Register,
+        reg3: Register,
     },
 }
 
@@ -153,6 +174,27 @@ impl InstructionStream {
             .get(guard, self.ip.get())?;
         self.ip.set(self.ip.get() + 1);
         Ok(instr)
+    }
+
+    /// Given an index into the literals list, return the pointer in the list at that index.
+    pub fn get_literal<'guard>(
+        &self,
+        guard: &'guard dyn MutatorScope,
+        lit_id: LiteralId,
+    ) -> Result<TaggedPtr, RuntimeError> {
+        Ok(IndexedContainer::get(
+            &self.instructions.get(guard).literals,
+            guard,
+            lit_id as ArraySize,
+        )?
+        .get_ptr())
+    }
+
+    /// Adjust the instruction pointer by the given signed offset from the current ip
+    pub fn jump(&self, offset: JumpOffset) {
+        let mut ip = self.ip.get() as i32;
+        ip += offset as i32;
+        self.ip.set(ip as ArraySize);
     }
 }
 

@@ -1,11 +1,12 @@
 use std::{cell::Cell, fmt, ops::Deref};
 
-use crate::memory::RawPtr;
+use crate::memory::{AllocObject, RawPtr};
 
 use super::{
     pointerops::ScopedRef,
     printer::Print,
     taggedptr::{FatPtr, TaggedPtr, Value},
+    TypeList,
 };
 
 /// Type that provides a generic anchor for mutator timeslice lifetimes
@@ -19,6 +20,18 @@ pub struct ScopedPtr<'guard, T: Sized> {
 impl<'guard, T: Sized> ScopedPtr<'guard, T> {
     pub fn new(_guard: &'guard dyn MutatorScope, value: &'guard T) -> ScopedPtr<'guard, T> {
         ScopedPtr { value }
+    }
+
+    /// Convert the compile-time type pointer to a runtime type pointer
+    pub fn as_tagged(&self, guard: &'guard dyn MutatorScope) -> TaggedScopedPtr<'guard>
+    where
+        FatPtr: From<RawPtr<T>>,
+        T: AllocObject<TypeList>,
+    {
+        TaggedScopedPtr::new(
+            guard,
+            TaggedPtr::from(FatPtr::from(RawPtr::new(self.value))),
+        )
     }
 }
 impl<'guard, T: Sized> Clone for ScopedPtr<'guard, T> {
@@ -141,6 +154,12 @@ impl TaggedCellPtr {
         }
     }
 
+    pub fn new_ptr(source: TaggedPtr) -> TaggedCellPtr {
+        TaggedCellPtr {
+            inner: Cell::new(source),
+        }
+    }
+
     /// Return the pointer as a `TaggedScopedPtr` type that carries a copy of the `TaggedPtr` and
     /// a `Value` type for both copying and access convenience
     pub fn get<'guard>(&self, guard: &'guard dyn MutatorScope) -> TaggedScopedPtr<'guard> {
@@ -167,5 +186,26 @@ impl TaggedCellPtr {
     /// Set this pointer to nil
     pub fn set_to_nil(&self) {
         self.inner.set(TaggedPtr::nil())
+    }
+
+    /// Set this pointer to another TaggedPtr
+    pub fn set_to_ptr(&self, ptr: TaggedPtr) {
+        self.inner.set(ptr)
+    }
+
+    /// Return the raw TaggedPtr from within
+    pub fn get_ptr(&self) -> TaggedPtr {
+        self.inner.get()
+    }
+}
+
+impl From<TaggedScopedPtr<'_>> for TaggedCellPtr {
+    fn from(ptr: TaggedScopedPtr) -> TaggedCellPtr {
+        TaggedCellPtr::new_with(ptr)
+    }
+}
+impl<'guard> PartialEq for TaggedScopedPtr<'guard> {
+    fn eq(&self, rhs: &TaggedScopedPtr<'guard>) -> bool {
+        self.ptr == rhs.ptr
     }
 }

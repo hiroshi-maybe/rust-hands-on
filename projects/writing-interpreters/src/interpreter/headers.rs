@@ -12,7 +12,7 @@ use super::{
     symbol::Symbol,
     taggedptr::FatPtr,
     text::Text,
-    vm::Upvalue,
+    vm::{Thread, Upvalue},
     ArrayU16, ArrayU32, ArrayU8,
 };
 
@@ -141,5 +141,8 @@ macro_rules! declare_allocobject {
 }
 
 declare_allocobject!(ByteCode, ByteCode);
+declare_allocobject!(List, List);
 declare_allocobject!(Pair, Pair);
 declare_allocobject!(Symbol, Symbol);
+declare_allocobject!(Thread, Thread);
+declare_allocobject!(Upvalue, Upvalue);
