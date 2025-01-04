@@ -1,6 +1,7 @@
 pub mod arena;
 pub mod array;
 pub mod bytecode;
+pub mod compiler;
 pub mod containers;
 pub mod dict;
 pub mod error;

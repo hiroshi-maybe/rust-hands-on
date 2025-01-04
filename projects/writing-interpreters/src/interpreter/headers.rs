@@ -146,3 +146,6 @@ declare_allocobject!(Pair, Pair);
 declare_allocobject!(Symbol, Symbol);
 declare_allocobject!(Thread, Thread);
 declare_allocobject!(Upvalue, Upvalue);
+declare_allocobject!(ArrayU16, ArrayU16);
+declare_allocobject!(Function, Function);
+declare_allocobject!(Partial, Partial);

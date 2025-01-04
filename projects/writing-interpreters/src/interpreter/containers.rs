@@ -2,7 +2,7 @@ use crate::memory::ArraySize;
 
 use super::{
     safeptr::{MutatorScope, TaggedCellPtr, TaggedScopedPtr},
-    MutatorView, RuntimeError,
+    MutatorView, RuntimeError, ScopedPtr,
 };
 
 /// Base container-type trait. All container types are subtypes of `Container`.
@@ -150,6 +150,44 @@ pub trait IndexedAnyContainer: IndexedContainer<TaggedCellPtr> {
         &self,
         _guard: &'guard dyn MutatorScope,
         index: ArraySize,
+        item: TaggedScopedPtr<'guard>,
+    ) -> Result<(), RuntimeError>;
+}
+
+/// Replace the contents of a container with the values in the slice
+pub trait ContainerFromSlice<T: Sized + Clone>: Container<T> {
+    fn from_slice<'guard>(
+        mem: &'guard MutatorView,
+        data: &[T],
+    ) -> Result<ScopedPtr<'guard, Self>, RuntimeError>;
+}
+
+/// Replace the contents of a container with the values in the slice
+pub trait AnyContainerFromSlice: Container<TaggedCellPtr> {
+    fn from_slice<'guard>(
+        mem: &'guard MutatorView,
+        data: &[TaggedScopedPtr<'guard>],
+    ) -> Result<ScopedPtr<'guard, Self>, RuntimeError>;
+}
+
+/// If implemented, the container can be filled with a set number of values in one operation
+pub trait FillContainer<T: Sized + Clone>: Container<T> {
+    /// The `item` is an object to copy into each container memory slot.
+    fn fill<'guard>(
+        &self,
+        mem: &'guard MutatorView,
+        size: ArraySize,
+        item: T,
+    ) -> Result<(), RuntimeError>;
+}
+
+/// If implemented, the container can be filled with a set number of values in one operation
+pub trait FillAnyContainer: FillContainer<TaggedCellPtr> {
+    /// The `item` is an object to copy into each container memory slot.
+    fn fill<'guard>(
+        &self,
+        mem: &'guard MutatorView,
+        size: ArraySize,
         item: TaggedScopedPtr<'guard>,
     ) -> Result<(), RuntimeError>;
 }

@@ -6,18 +6,20 @@ use super::{
     array::Array,
     bytecode::{InstructionStream, Opcode},
     containers::{
-        Container, HashIndexedAnyContainer, IndexedAnyContainer, IndexedContainer,
-        SliceableContainer, StackAnyContainer,
+        Container, FillAnyContainer, HashIndexedAnyContainer, IndexedAnyContainer,
+        IndexedContainer, SliceableContainer, StackAnyContainer, StackContainer,
     },
     dict::Dict,
     error::err_eval,
-    function::Function,
+    function::{Function, Partial},
     list::List,
+    pair::Pair,
     safeptr::{MutatorScope, TaggedCellPtr, TaggedScopedPtr},
     taggedptr::{TaggedPtr, Value},
     CellPtr, MutatorView, RuntimeError, ScopedPtr,
 };
 
+pub const RETURN_REG: usize = 0;
 pub const ENV_REG: usize = 1;
 pub const FIRST_ARG_REG: usize = 2;
 
@@ -257,6 +259,270 @@ impl Thread {
                         }
                     }
                 }
+                Opcode::Return { reg } => {
+                    // write the return value to register 0
+                    let result = window[reg as usize].get_ptr();
+                    window[RETURN_REG].set_to_ptr(result);
+
+                    // remove this function's stack frame
+                    frames.pop(mem)?;
+
+                    // if we just returned from the last stack frame, program evaluation is complete
+                    if frames.length() == 0 {
+                        return Ok(EvalStatus::Return(window[RETURN_REG].get(mem)));
+                    } else {
+                        // otherwise restore the previous stack frame settings
+                        let frame = frames.top(mem)?;
+                        self.stack_base.set(frame.base);
+                        instr.switch_frame(frame.function.get(mem).code(mem), frame.ip.get());
+                    }
+                }
+                // Set the register `dest` to `nil`
+                Opcode::LoadNil { dest } => {
+                    window[dest as usize].set_to_nil();
+                }
+                // Lookup a global binding and put it in the register `dest`
+                Opcode::LoadGlobal { dest, name } => {
+                    let name_val = window[name as usize].get(mem);
+
+                    if let Value::Symbol(_) = *name_val {
+                        let lookup_result = globals.lookup(mem, name_val);
+
+                        match lookup_result {
+                            Ok(binding) => window[dest as usize].set(binding),
+                            Err(_) => {
+                                return Err(err_eval(&format!(
+                                    "Symbol {} is not bound to a value",
+                                    name_val
+                                )))
+                            }
+                        }
+                    } else {
+                        return Err(err_eval("Cannot lookup global for non-symbol type"));
+                    }
+                }
+                // Evaluate whether the `test` register contains an atomic value - i.e. a
+                // non-container type. Set the `dest` register to "true" or `nil`.
+                Opcode::IsAtom { dest, test } => {
+                    let test_val = window[test as usize].get(mem);
+
+                    match *test_val {
+                        Value::Pair(_) => window[dest as usize].set_to_nil(),
+                        Value::Nil => window[dest as usize].set_to_nil(),
+                        // TODO what other types?
+                        _ => window[dest as usize].set(mem.lookup_sym("true")),
+                    }
+                }
+                // Evaluate whether the `test` register contains `nil` - if so, set the `dest`
+                // register to the symbol "true", otherwise set it to `nil`
+                Opcode::IsNil { dest, test } => {
+                    let test_val = window[test as usize].get(mem);
+
+                    match *test_val {
+                        Value::Nil => window[dest as usize].set(mem.lookup_sym("true")),
+                        _ => window[dest as usize].set_to_nil(),
+                    }
+                }
+                // CAR - get the first value of a Pair object
+                Opcode::FirstOfPair { dest, reg } => {
+                    let reg_val = window[reg as usize].get(mem);
+
+                    match *reg_val {
+                        Value::Pair(p) => window[dest as usize].set_to_ptr(p.first.get_ptr()),
+                        Value::Nil => window[dest as usize].set_to_nil(),
+                        _ => return Err(err_eval("Parameter to FirstOfPair is not a list")),
+                    }
+                }
+                // CDR - get the second value of a Pair object
+                Opcode::SecondOfPair { dest, reg } => {
+                    let reg_val = window[reg as usize].get(mem);
+
+                    match *reg_val {
+                        Value::Pair(p) => window[dest as usize].set_to_ptr(p.second.get_ptr()),
+                        Value::Nil => window[dest as usize].set_to_nil(),
+                        _ => return Err(err_eval("Parameter to SecondOfPair is not a list")),
+                    }
+                }
+                // CONS - create a Pair, pointing to `reg1` and `reg2`
+                Opcode::MakePair { dest, reg1, reg2 } => {
+                    let reg1_val = window[reg1 as usize].get_ptr();
+                    let reg2_val = window[reg2 as usize].get_ptr();
+
+                    let new_pair = Pair::new();
+                    new_pair.first.set_to_ptr(reg1_val);
+                    new_pair.second.set_to_ptr(reg2_val);
+
+                    window[dest as usize].set(mem.alloc_tagged(new_pair)?);
+                }
+                // Identity comparison - if `test1` and `test2` are identical pointers, set `dest`
+                // to the symbol "true"
+                Opcode::IsIdentical { dest, test1, test2 } => {
+                    // compare raw pointers - identity comparison
+                    let test1_val = window[test1 as usize].get_ptr();
+                    let test2_val = window[test2 as usize].get_ptr();
+
+                    if test1_val == test2_val {
+                        window[dest as usize].set(mem.lookup_sym("true"));
+                    } else {
+                        window[dest as usize].set(mem.nil());
+                    }
+                }
+                // Bind a symbol to the `src` register in the globals dict
+                Opcode::StoreGlobal { src, name } => {
+                    let name_val = window[name as usize].get(mem);
+                    if let Value::Symbol(_) = *name_val {
+                        let src_val = window[src as usize].get(mem);
+                        globals.assoc(mem, name_val, src_val)?;
+                    } else {
+                        return Err(err_eval("Cannot bind global to non-symbol type"));
+                    }
+                }
+                // Simple copy of one register to another
+                Opcode::CopyRegister { dest, src } => {
+                    window[dest as usize] = window[src as usize].clone();
+                }
+                // Call the function referred to by the `function` register, put the result in the
+                // `dest` register.
+                //
+                // The function can be a Function object or a Partial.
+                //
+                // If the arg_count is less than the function arity, return a Partial instead of
+                // entering the function.
+                //
+                // If the arg_count is equal to the Function or Partial arity, enter the Function
+                // object code.
+                Opcode::Call {
+                    function,
+                    dest,
+                    arg_count,
+                } => {
+                    let binding = window[function as usize].get(mem);
+
+                    // To avoid duplicating code in function and partial application cases,
+                    // this is declared as a closure so it can access local variables
+                    let new_call_frame = |function| -> Result<(), RuntimeError> {
+                        // Modify the current call frame, saving the return ip
+                        let current_frame_ip = instr.get_next_ip();
+                        frames.access_slice(mem, |f| {
+                            f.last()
+                                .expect("No CallFrames in slice!")
+                                .ip
+                                .set(current_frame_ip)
+                        });
+
+                        // Create a new call frame, pushing it to the frame stack
+                        let new_stack_base = self.stack_base.get() + dest as ArraySize;
+                        let frame = CallFrame::new(function, 0, new_stack_base);
+                        frames.push(mem, frame)?;
+
+                        // Update the instruction stream to point to the new function
+                        let code = function.code(mem);
+                        self.stack_base.set(new_stack_base);
+                        instr.switch_frame(code, 0);
+
+                        // Ensure the stack has 256 registers allocated
+                        // TODO reset to nil to avoid accidental leakage of previous call values
+                        // TODO Ruh-roh we shouldn't be able to modify the stack size from
+                        // within an access_slice() call :grimace:
+                        stack.fill(mem, new_stack_base + 256, mem.nil())?;
+
+                        Ok(())
+                    };
+
+                    // Handle the two similar-but-different cases: this might be a Function object
+                    // or a Partial application object
+                    match *binding {
+                        Value::Function(function) => {
+                            let arity = function.arity();
+
+                            if arg_count < arity {
+                                // Too few args, return a Partial object
+                                let args_start = dest as usize + FIRST_ARG_REG;
+                                let args_end = args_start + arg_count as usize;
+
+                                let partial = Partial::alloc(
+                                    mem,
+                                    function,
+                                    None,
+                                    &window[args_start..args_end],
+                                )?;
+
+                                window[dest as usize].set(partial.as_tagged(mem));
+
+                                return Ok(EvalStatus::Pending);
+                            } else if arg_count > arity {
+                                // Too many args, we haven't got a continuations stack (yet)
+                                return Err(err_eval(&format!(
+                                    "Function {} expected {} arguments, got {}",
+                                    binding,
+                                    function.arity(),
+                                    arg_count
+                                )));
+                            }
+
+                            new_call_frame(function)?;
+                        }
+
+                        Value::Partial(partial) => {
+                            let arity = partial.arity();
+
+                            if arg_count == 0 && arity > 0 {
+                                // Partial is unchanged, no args added, copy directly to dest
+                                window[dest as usize]
+                                    .set_to_ptr(window[function as usize].get_ptr());
+                                return Ok(EvalStatus::Pending);
+                            } else if arg_count < arity {
+                                // Too few args, bake a new Partial from the existing one, adding the new
+                                // arguments
+                                let args_start = dest as usize + FIRST_ARG_REG;
+                                let args_end = args_start + arg_count as usize;
+
+                                let new_partial = Partial::alloc_clone(
+                                    mem,
+                                    partial,
+                                    &window[args_start..args_end],
+                                )?;
+
+                                window[dest as usize].set(new_partial.as_tagged(mem));
+
+                                return Ok(EvalStatus::Pending);
+                            } else if arg_count > arity {
+                                // Too many args, we haven't got a continuations stack
+                                return Err(err_eval(&format!(
+                                    "Partial {} expected {} arguments, got {}",
+                                    binding,
+                                    partial.arity(),
+                                    arg_count
+                                )));
+                            }
+
+                            // Copy closure env pointer
+                            window[dest as usize + ENV_REG] = partial.closure_env();
+
+                            // Shunt _call_ args back into the window to make space for the
+                            // partially applied args
+                            let push_dist = partial.used();
+                            let from_reg = dest as usize + FIRST_ARG_REG;
+                            let to_reg = from_reg + push_dist as usize;
+                            for index in (0..arg_count as usize).rev() {
+                                window[to_reg + index] = window[from_reg + index].clone();
+                            }
+
+                            // copy args from Partial to the register window
+                            let args = partial.args(mem);
+                            let start_reg = dest as usize + FIRST_ARG_REG;
+                            args.access_slice(mem, |items| {
+                                for (index, item) in items.iter().enumerate() {
+                                    window[start_reg + index] = item.clone();
+                                }
+                            });
+
+                            new_call_frame(partial.function(mem))?;
+                        }
+
+                        _ => return Err(err_eval("Type is not callable")),
+                    }
+                }
             }
 
             Ok(EvalStatus::Pending)
@@ -306,6 +572,22 @@ impl Thread {
                 }
             }
             Err(e) => Err(e),
+        }
+    }
+}
+
+impl CallFrame {
+    /// Instantiate a new stack frame for the given function, beginning execution at the given
+    /// instruction pointer and a register window at `base`
+    fn new<'guard>(
+        function: ScopedPtr<'guard, Function>,
+        ip: ArraySize,
+        base: ArraySize,
+    ) -> CallFrame {
+        CallFrame {
+            function: CellPtr::new_with(function),
+            ip: Cell::new(ip),
+            base,
         }
     }
 }

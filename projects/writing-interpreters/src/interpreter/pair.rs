@@ -3,7 +3,7 @@ use std::{cell::Cell, fmt};
 use crate::interpreter::{taggedptr::Value, ScopedPtr};
 
 use super::{
-    error::SourcePos,
+    error::{err_eval, SourcePos},
     printer::Print,
     safeptr::{MutatorScope, TaggedCellPtr, TaggedScopedPtr},
     MutatorView, RuntimeError,
@@ -104,5 +104,88 @@ impl Print for Pair {
             self.first.get(guard),
             self.second.get(guard)
         )
+    }
+}
+
+/// Unpack a list of Pair instances into a Vec
+pub fn vec_from_pairs<'guard>(
+    guard: &'guard dyn MutatorScope,
+    pair_list: TaggedScopedPtr<'guard>,
+) -> Result<Vec<TaggedScopedPtr<'guard>>, RuntimeError> {
+    match *pair_list {
+        Value::Pair(pair) => {
+            let mut result = Vec::new();
+
+            result.push(pair.first.get(guard));
+
+            let mut next = pair.second.get(guard);
+            while let Value::Pair(next_pair) = *next {
+                result.push(next_pair.first.get(guard));
+                next = next_pair.second.get(guard);
+            }
+
+            // we've terminated the list, but correctly?
+            match *next {
+                Value::Nil => Ok(result),
+                _ => Err(err_eval("Incorrectly terminated Pair list")),
+            }
+        }
+        Value::Nil => Ok(Vec::new()),
+        _ => Err(err_eval("Expected a Pair")),
+    }
+}
+
+/// Convenience function for unpacking a list of Pair instances into one value
+pub fn value_from_1_pair<'guard>(
+    guard: &'guard dyn MutatorScope,
+    pair_list: TaggedScopedPtr<'guard>,
+) -> Result<TaggedScopedPtr<'guard>, RuntimeError> {
+    let result = vec_from_pairs(guard, pair_list)?;
+
+    match result.as_slice() {
+        [first] => Ok(*first),
+        _ => Err(err_eval(&format!(
+            "Pair list has {} items, expected 1",
+            result.len()
+        ))),
+    }
+}
+
+/// Convenience function for unpacking a list of Pair instances into two values
+pub fn values_from_2_pairs<'guard>(
+    guard: &'guard dyn MutatorScope,
+    pair_list: TaggedScopedPtr<'guard>,
+) -> Result<(TaggedScopedPtr<'guard>, TaggedScopedPtr<'guard>), RuntimeError> {
+    let result = vec_from_pairs(guard, pair_list)?;
+
+    match result.as_slice() {
+        [first, second] => Ok((*first, *second)),
+        _ => Err(err_eval(&format!(
+            "Pair list has {} items, expected 2",
+            result.len()
+        ))),
+    }
+}
+
+/// Convenience function for unpacking a list of Pair instances into three values
+pub fn values_from_3_pairs<'guard>(
+    guard: &'guard dyn MutatorScope,
+    pair_list: TaggedScopedPtr<'guard>,
+) -> Result<
+    (
+        TaggedScopedPtr<'guard>,
+        TaggedScopedPtr<'guard>,
+        TaggedScopedPtr<'guard>,
+    ),
+    RuntimeError,
+> {
+    let result = vec_from_pairs(guard, pair_list)?;
+
+    match result.as_slice() {
+        [first, second, third] => Ok((*first, *second, *third)),
+        _ => Err(err_eval(&format!(
+            "Pair list has {} items, expected 3",
+            result.len()
+        ))),
     }
 }

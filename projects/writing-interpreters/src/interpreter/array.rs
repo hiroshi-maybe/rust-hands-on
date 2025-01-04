@@ -9,7 +9,8 @@ use crate::memory::{AllocObject, ArraySize};
 
 use super::{
     containers::{
-        Container, IndexedAnyContainer, IndexedContainer, SliceableContainer, StackAnyContainer,
+        AnyContainerFromSlice, Container, ContainerFromSlice, FillAnyContainer, FillContainer,
+        IndexedAnyContainer, IndexedContainer, SliceableContainer, StackAnyContainer,
         StackContainer,
     },
     error::ErrorKind,
@@ -46,6 +47,17 @@ impl<T: Sized + Clone> Array<T> {
         Array<T>: AllocObject<TypeList>,
     {
         mem.alloc(Array::new())
+    }
+
+    /// Clone the contents of an existing Array
+    pub fn alloc_clone<'guard>(
+        mem: &'guard MutatorView,
+        from_array: ScopedPtr<'guard, Array<T>>,
+    ) -> Result<ScopedPtr<'guard, Array<T>>, RuntimeError>
+    where
+        Array<T>: AllocObject<TypeList> + ContainerFromSlice<T>,
+    {
+        from_array.access_slice(mem, |items| ContainerFromSlice::from_slice(mem, items))
     }
 
     /// Allocate a new instance on the heap with pre-allocated capacity
@@ -121,6 +133,19 @@ impl<T: Sized + Clone> Array<T> {
     pub unsafe fn as_slice<'guard>(&self, _guard: &'guard dyn MutatorScope) -> &mut [T] {
         if let Some(ptr) = self.data.get().as_ptr() {
             from_raw_parts_mut(ptr as *mut T, self.length.get() as usize)
+        } else {
+            &mut []
+        }
+    }
+
+    /// Represent the full capacity of the array, however initialized, as a slice.
+    /// This is necessarily unsafe even for the 'guard lifetime
+    /// duration because while a slice is held, other code can cause array internals to change
+    /// that might cause the slice pointer and length to become invalid. Interior mutability
+    /// patterns such as RefCell-style should be used in addition.
+    pub unsafe fn as_capacity_slice<'guard>(&self, _guard: &'guard dyn MutatorScope) -> &mut [T] {
+        if let Some(ptr) = self.data.get().as_ptr() {
+            from_raw_parts_mut(ptr as *mut T, self.data.get().capacity() as usize)
         } else {
             &mut []
         }
@@ -241,6 +266,22 @@ impl<T: Sized + Clone> IndexedContainer<T> for Array<T> {
     }
 }
 
+impl<T: Clone + Sized> ContainerFromSlice<T> for Array<T>
+where
+    Array<T>: AllocObject<TypeList>,
+{
+    fn from_slice<'guard>(
+        mem: &'guard MutatorView,
+        data: &[T],
+    ) -> Result<ScopedPtr<'guard, Array<T>>, RuntimeError> {
+        let array = Array::alloc_with_capacity(mem, data.len() as ArraySize)?;
+        let slice = unsafe { array.as_capacity_slice(mem) };
+        slice.clone_from_slice(data);
+        array.length.set(data.len() as ArraySize);
+        Ok(array)
+    }
+}
+
 impl StackAnyContainer for Array<TaggedCellPtr> {
     /// Push can trigger an underlying array resize, hence it requires the ability to allocate    
     fn push<'guard>(
@@ -279,6 +320,24 @@ impl<T: Sized + Clone> SliceableContainer<T> for Array<T> {
         let result = f(slice);
         self.borrow.set(INTERIOR_ONLY);
         result
+    }
+}
+
+impl AnyContainerFromSlice for Array<TaggedCellPtr> {
+    fn from_slice<'guard>(
+        mem: &'guard MutatorView,
+        data: &[TaggedScopedPtr<'guard>],
+    ) -> Result<ScopedPtr<'guard, Self>, RuntimeError> {
+        let array = Array::<TaggedCellPtr>::alloc_with_capacity(mem, data.len() as ArraySize)?;
+        let slice = unsafe { array.as_capacity_slice(mem) };
+
+        // probably slow
+        for index in 0..data.len() {
+            slice[index] = TaggedCellPtr::new_with(data[index])
+        }
+
+        array.length.set(data.len() as ArraySize);
+        Ok(array)
     }
 }
 
@@ -338,5 +397,79 @@ impl IndexedAnyContainer for Array<TaggedCellPtr> {
     ) -> Result<(), RuntimeError> {
         self.read_ref(guard, index)?.set(item);
         Ok(())
+    }
+}
+
+impl<T: Sized + Clone> FillContainer<T> for Array<T> {
+    fn fill<'guard>(
+        &self,
+        mem: &'guard MutatorView,
+        size: ArraySize,
+        item: T,
+    ) -> Result<(), RuntimeError> {
+        let length = self.length();
+
+        if length > size {
+            Ok(())
+        } else {
+            let mut array = self.data.get(); // Takes a copy
+
+            let capacity = array.capacity();
+
+            if size > capacity {
+                if capacity == 0 {
+                    array.resize(mem, DEFAULT_ARRAY_SIZE)?;
+                } else {
+                    array.resize(mem, default_array_growth(capacity)?)?;
+                }
+                // Replace the struct's copy with the resized RawArray object
+                self.data.set(array);
+            }
+
+            self.length.set(size);
+
+            for index in length..size {
+                self.write(mem, index, item.clone())?;
+            }
+
+            Ok(())
+        }
+    }
+}
+
+impl FillAnyContainer for Array<TaggedCellPtr> {
+    fn fill<'guard>(
+        &self,
+        mem: &'guard MutatorView,
+        size: ArraySize,
+        item: TaggedScopedPtr<'guard>,
+    ) -> Result<(), RuntimeError> {
+        let length = self.length();
+
+        if length > size {
+            Ok(())
+        } else {
+            let mut array = self.data.get(); // Takes a copy
+
+            let capacity = array.capacity();
+
+            if size > capacity {
+                if capacity == 0 {
+                    array.resize(mem, DEFAULT_ARRAY_SIZE)?;
+                } else {
+                    array.resize(mem, default_array_growth(capacity)?)?;
+                }
+                // Replace the struct's copy with the resized RawArray object
+                self.data.set(array);
+            }
+
+            self.length.set(size);
+
+            for index in length..size {
+                self.write(mem, index, TaggedCellPtr::new_with(item))?;
+            }
+
+            Ok(())
+        }
     }
 }

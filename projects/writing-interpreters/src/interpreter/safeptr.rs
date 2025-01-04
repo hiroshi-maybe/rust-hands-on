@@ -126,6 +126,10 @@ impl<'guard> fmt::Display for TaggedScopedPtr<'guard> {
     }
 }
 
+/// Anything that _has_ a scope lifetime can pass as a scope representation. `Value` also implements
+/// `MutatorScope` so this is largely for consistency.
+impl<'scope> MutatorScope for TaggedScopedPtr<'scope> {}
+
 impl<'guard> fmt::Debug for TaggedScopedPtr<'guard> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.value.fmt(f)

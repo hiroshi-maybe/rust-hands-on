@@ -25,6 +25,8 @@ pub type UpvalueId = u8;
 
 /// An instruction jump target is a signed integer, relative to the jump instruction
 pub type JumpOffset = i16;
+/// Jump offset when the target is still unknown.
+pub const JUMP_UNKNOWN: i16 = 0x7fff;
 
 /// Bytecode is stored as fixed-width 32-bit values.
 /// This is not the most efficient format but it is easy to work with.
@@ -33,6 +35,9 @@ pub type ArrayOpcode = Array<Opcode>;
 /// Literals are stored in a separate list of machine-word-width pointers.
 /// This is also not the most efficient scheme but it is easy to work with.
 pub type Literals = List;
+
+/// Argument count for a function call or partial application
+pub type NumArgs = u8;
 
 #[derive(Clone)]
 pub struct ByteCode {
@@ -56,7 +61,7 @@ impl ByteCode {
         self.code.push(mem, op)
     }
 
-    fn update_jump_offset<'guard>(
+    pub fn update_jump_offset<'guard>(
         &self,
         mem: &'guard MutatorView,
         instruction: ArraySize,
@@ -88,7 +93,7 @@ impl ByteCode {
         Ok(id)
     }
 
-    fn push_loadlit<'guard>(
+    pub fn push_loadlit<'guard>(
         &self,
         mem: &'guard MutatorView,
         dest: Register,
@@ -101,6 +106,16 @@ impl ByteCode {
                 literal: literal_id,
             },
         )
+    }
+
+    /// Get the index into the bytecode array of the next instruction that will be pushed
+    pub fn next_instruction(&self) -> ArraySize {
+        self.code.length()
+    }
+
+    /// Get the index into the bytecode array of the last instruction
+    pub fn last_instruction(&self) -> ArraySize {
+        self.code.length() - 1
     }
 }
 
@@ -145,6 +160,55 @@ pub enum Opcode {
         reg1: Register,
         reg2: Register,
         reg3: Register,
+    },
+    Return {
+        reg: Register,
+    },
+    LoadNil {
+        dest: Register,
+    },
+    LoadGlobal {
+        dest: Register,
+        name: Register,
+    },
+    IsAtom {
+        dest: Register,
+        test: Register,
+    },
+    IsNil {
+        dest: Register,
+        test: Register,
+    },
+    FirstOfPair {
+        dest: Register,
+        reg: Register,
+    },
+    SecondOfPair {
+        dest: Register,
+        reg: Register,
+    },
+    MakePair {
+        dest: Register,
+        reg1: Register,
+        reg2: Register,
+    },
+    IsIdentical {
+        dest: Register,
+        test1: Register,
+        test2: Register,
+    },
+    StoreGlobal {
+        src: Register,
+        name: Register,
+    },
+    CopyRegister {
+        dest: Register,
+        src: Register,
+    },
+    Call {
+        function: Register,
+        dest: Register,
+        arg_count: NumArgs,
     },
 }
 
@@ -195,6 +259,11 @@ impl InstructionStream {
         let mut ip = self.ip.get() as i32;
         ip += offset as i32;
         self.ip.set(ip as ArraySize);
+    }
+
+    /// Return the next instruction pointer
+    pub fn get_next_ip(&self) -> ArraySize {
+        self.ip.get()
     }
 }
 
