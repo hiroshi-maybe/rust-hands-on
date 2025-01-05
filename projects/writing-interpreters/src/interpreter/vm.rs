@@ -4,7 +4,7 @@ use crate::memory::ArraySize;
 
 use super::{
     array::Array,
-    bytecode::{InstructionStream, Opcode},
+    bytecode::{ByteCode, InstructionStream, Opcode},
     containers::{
         Container, FillAnyContainer, HashIndexedAnyContainer, IndexedAnyContainer,
         IndexedContainer, SliceableContainer, StackAnyContainer, StackContainer,
@@ -138,6 +138,111 @@ impl Upvalue {
 }
 
 impl Thread {
+    /// Allocate a new Thread with a minimal stack preallocated but not associated with any
+    /// bytecode yet.
+    pub fn alloc<'guard>(
+        mem: &'guard MutatorView,
+    ) -> Result<ScopedPtr<'guard, Thread>, RuntimeError> {
+        // create an empty stack frame array
+        let frames = CallFrameList::alloc_with_capacity(mem, 16)?;
+
+        // create a minimal value stack
+        let stack = List::alloc_with_capacity(mem, 256)?;
+        stack.fill(mem, 256, mem.nil())?;
+
+        // create an empty upvalue stack->heap mapping
+        let upvalues = Dict::alloc(mem)?;
+
+        // create an empty globals dict
+        let globals = Dict::alloc(mem)?;
+
+        // create an empty instruction stream
+        let blank_code = ByteCode::alloc(mem)?;
+        let instr = InstructionStream::alloc(mem, blank_code)?;
+
+        mem.alloc(Thread {
+            frames: CellPtr::new_with(frames),
+            stack: CellPtr::new_with(stack),
+            stack_base: Cell::new(0),
+            upvalues: CellPtr::new_with(upvalues),
+            globals: CellPtr::new_with(globals),
+            instr: CellPtr::new_with(instr),
+        })
+    }
+
+    /// Evaluate a Function completely, returning the result. The Function passed in should expect
+    /// no arguments.
+    pub fn quick_vm_eval<'guard>(
+        &self,
+        mem: &'guard MutatorView,
+        function: ScopedPtr<'guard, Function>,
+    ) -> Result<TaggedScopedPtr<'guard>, RuntimeError> {
+        let mut status = EvalStatus::Pending;
+
+        let frames = self.frames.get(mem);
+        frames.push(mem, CallFrame::new_main(function))?;
+
+        let code = function.code(mem);
+
+        while status == EvalStatus::Pending {
+            status = self.vm_eval_stream(mem, code, 1024)?;
+            match status {
+                EvalStatus::Return(value) => return Ok(value),
+                _ => (),
+            }
+        }
+
+        Err(err_eval("Unexpected end of evaluation"))
+    }
+
+    /// Given ByteCode, execute up to max_instr more instructions
+    fn vm_eval_stream<'guard>(
+        &self,
+        mem: &'guard MutatorView,
+        code: ScopedPtr<'guard, ByteCode>,
+        max_instr: ArraySize,
+    ) -> Result<EvalStatus<'guard>, RuntimeError> {
+        let instr = self.instr.get(mem);
+        // TODO this is broken logic, this function shouldn't switch back to this code object every
+        // time it is called
+        instr.switch_frame(code, 0);
+
+        for _ in 0..max_instr {
+            match self.eval_next_instr(mem) {
+                // Evaluation paused or completed without error
+                Ok(exit_cond) => match exit_cond {
+                    EvalStatus::Return(value) => return Ok(EvalStatus::Return(value)),
+                    _ => (),
+                },
+
+                // Evaluation hit an error
+                Err(rt_error) => {
+                    // unwind the stack, printing a trace
+                    let frames = self.frames.get(mem);
+
+                    // Print a stack trace if the error is multiple call frames deep
+                    frames.access_slice(mem, |window| {
+                        if window.len() > 1 {
+                            println!("Error traceback:");
+                        }
+
+                        for frame in &window[1..] {
+                            println!("  {}", frame.as_string(mem));
+                        }
+                    });
+
+                    // Unwind by clearing all frames from the stack
+                    frames.clear(mem)?;
+                    self.stack_base.set(0);
+
+                    return Err(rt_error);
+                }
+            }
+        }
+
+        Ok(EvalStatus::Pending)
+    }
+
     /// Execute the next instruction in the current instruction stream
     fn eval_next_instr<'guard>(
         &self,
@@ -577,6 +682,15 @@ impl Thread {
 }
 
 impl CallFrame {
+    /// Instantiate an outer-level call frame at the beginning of the stack
+    pub fn new_main<'guard>(main_fn: ScopedPtr<'guard, Function>) -> CallFrame {
+        CallFrame {
+            function: CellPtr::new_with(main_fn),
+            ip: Cell::new(0),
+            base: 0,
+        }
+    }
+
     /// Instantiate a new stack frame for the given function, beginning execution at the given
     /// instruction pointer and a register window at `base`
     fn new<'guard>(
@@ -589,6 +703,12 @@ impl CallFrame {
             ip: Cell::new(ip),
             base,
         }
+    }
+
+    /// Return a string representation of this stack frame
+    fn as_string<'guard>(&self, guard: &'guard dyn MutatorScope) -> String {
+        let function = self.function.get(guard);
+        format!("in {}", function)
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::memory::{AllocHeader, AllocObject, AllocRaw, AllocTypeId, Mark, RawPtr, SizeClass};
 
 use super::{
-    bytecode::ByteCode,
+    bytecode::{ByteCode, InstructionStream},
     dict::Dict,
     function::{Function, Partial},
     list::List,
@@ -12,7 +12,7 @@ use super::{
     symbol::Symbol,
     taggedptr::FatPtr,
     text::Text,
-    vm::{Thread, Upvalue},
+    vm::{CallFrameList, Thread, Upvalue},
     ArrayU16, ArrayU32, ArrayU8,
 };
 
@@ -107,27 +107,32 @@ impl AllocHeader for ObjectHeader {
         size_class: SizeClass,
         mark: Mark,
     ) -> Self {
-        todo!()
+        ObjectHeader {
+            mark,
+            size_class,
+            type_id: TypeList::ArrayBackingBytes,
+            size_bytes: size as u32,
+        }
     }
 
     fn mark(&mut self) {
-        todo!()
+        self.mark = Mark::Marked;
     }
 
     fn is_marked(&self) -> bool {
-        todo!()
+        self.mark == Mark::Marked
     }
 
     fn size_class(&self) -> SizeClass {
-        todo!()
+        self.size_class
     }
 
     fn size(&self) -> u32 {
-        todo!()
+        self.size_bytes
     }
 
     fn type_id(&self) -> Self::TypeId {
-        todo!()
+        self.type_id
     }
 }
 
@@ -140,12 +145,15 @@ macro_rules! declare_allocobject {
     };
 }
 
+declare_allocobject!(ArrayU16, ArrayU16);
 declare_allocobject!(ByteCode, ByteCode);
+declare_allocobject!(CallFrameList, CallFrameList);
+declare_allocobject!(Dict, Dict);
+declare_allocobject!(Function, Function);
+declare_allocobject!(InstructionStream, InstructionStream);
 declare_allocobject!(List, List);
 declare_allocobject!(Pair, Pair);
+declare_allocobject!(Partial, Partial);
 declare_allocobject!(Symbol, Symbol);
 declare_allocobject!(Thread, Thread);
 declare_allocobject!(Upvalue, Upvalue);
-declare_allocobject!(ArrayU16, ArrayU16);
-declare_allocobject!(Function, Function);
-declare_allocobject!(Partial, Partial);

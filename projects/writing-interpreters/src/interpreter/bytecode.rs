@@ -220,6 +220,17 @@ pub struct InstructionStream {
 }
 
 impl InstructionStream {
+    /// Create an InstructionStream instance with the given ByteCode instance that will be iterated over
+    pub fn alloc<'guard>(
+        mem: &'guard MutatorView,
+        code: ScopedPtr<'_, ByteCode>,
+    ) -> Result<ScopedPtr<'guard, InstructionStream>, RuntimeError> {
+        mem.alloc(InstructionStream {
+            instructions: CellPtr::new_with(code),
+            ip: Cell::new(0),
+        })
+    }
+
     pub fn switch_frame(&self, code: ScopedPtr<'_, ByteCode>, ip: ArraySize) {
         self.instructions.set(code);
         self.ip.set(ip);

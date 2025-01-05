@@ -5,14 +5,14 @@ use fnv::FnvHasher;
 use crate::memory::ArraySize;
 
 use super::{
-    containers::HashIndexedAnyContainer,
+    containers::{Container, HashIndexedAnyContainer},
     error::ErrorKind,
     hashable::Hashable,
     printer::Print,
     rawarray::{default_array_growth, RawArray},
     safeptr::{MutatorScope, TaggedCellPtr, TaggedScopedPtr},
     taggedptr::Value,
-    MutatorView, RuntimeError,
+    MutatorView, RuntimeError, ScopedPtr,
 };
 
 // max load factor before resizing the table
@@ -38,6 +38,13 @@ pub struct DictItem {
 }
 
 impl Dict {
+    /// Allocate a new instance on the heap
+    pub fn alloc<'guard>(
+        mem: &'guard MutatorView,
+    ) -> Result<ScopedPtr<'guard, Dict>, RuntimeError> {
+        mem.alloc(Dict::new())
+    }
+
     /// Scale capacity up if needed
     fn grow_capacity<'guard>(&self, mem: &'guard MutatorView) -> Result<(), RuntimeError> {
         let data = self.data.get();
@@ -129,6 +136,25 @@ fn needs_to_grow(used_entries: ArraySize, capacity: ArraySize) -> bool {
     ratio > LOAD_FACTOR
 }
 
+/// Reset all slots to a blank entry
+fn fill_with_blank_entries<'guard>(
+    _guard: &'guard dyn MutatorScope,
+    data: &RawArray<DictItem>,
+) -> Result<(), RuntimeError> {
+    let ptr = data
+        .as_ptr()
+        .ok_or(RuntimeError::new(ErrorKind::BoundsError))?;
+
+    let blank_entry = DictItem::blank();
+
+    for index in 0..data.capacity() {
+        let entry = unsafe { &mut *(ptr.offset(index as isize) as *mut DictItem) as &mut DictItem };
+        *entry = blank_entry.clone();
+    }
+
+    Ok(())
+}
+
 /// Hashable-indexed interface. Objects used as keys must implement Hashable.
 impl HashIndexedAnyContainer for Dict {
     fn lookup<'guard>(
@@ -214,6 +240,44 @@ impl HashIndexedAnyContainer for Dict {
     }
 }
 
+impl Container<DictItem> for Dict {
+    fn new() -> Dict {
+        Dict {
+            length: Cell::new(0),
+            used_entries: Cell::new(0),
+            data: Cell::new(RawArray::new()),
+        }
+    }
+
+    fn with_capacity<'guard>(
+        mem: &'guard MutatorView,
+        capacity: ArraySize,
+    ) -> Result<Self, RuntimeError> {
+        let dict = Dict {
+            length: Cell::new(0),
+            used_entries: Cell::new(0),
+            data: Cell::new(RawArray::with_capacity(mem, capacity)?),
+        };
+
+        let data = dict.data.get();
+        fill_with_blank_entries(mem, &data)?;
+
+        Ok(dict)
+    }
+
+    fn clear<'guard>(&self, mem: &'guard MutatorView) -> Result<(), RuntimeError> {
+        let data = self.data.get();
+        fill_with_blank_entries(mem, &data)?;
+        self.length.set(0);
+        self.used_entries.set(0);
+        Ok(())
+    }
+
+    fn length(&self) -> ArraySize {
+        self.length.get()
+    }
+}
+
 impl Print for Dict {
     fn print<'guard>(
         &self,
@@ -221,5 +285,15 @@ impl Print for Dict {
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
         write!(f, "Dict[unimplemented]")
+    }
+}
+
+impl DictItem {
+    fn blank() -> DictItem {
+        DictItem {
+            key: TaggedCellPtr::new_nil(),
+            value: TaggedCellPtr::new_nil(),
+            hash: 0,
+        }
     }
 }

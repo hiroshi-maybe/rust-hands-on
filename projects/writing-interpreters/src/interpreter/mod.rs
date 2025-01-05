@@ -17,6 +17,7 @@ pub mod parser;
 pub mod pointerops;
 pub mod printer;
 pub mod rawarray;
+pub mod repl;
 pub mod safeptr;
 pub mod symbol;
 pub mod symbolmap;
