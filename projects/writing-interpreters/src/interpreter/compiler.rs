@@ -826,3 +826,64 @@ impl Nonlocal {
         }
     }
 }
+
+/// INTEGRATION TESTS
+/// TODO - move to a separate module
+#[cfg(test)]
+mod integration {
+    use super::*;
+    use crate::interpreter::memory::Memory;
+    use crate::interpreter::parser::parse;
+    use crate::interpreter::vm::Thread;
+    use crate::interpreter::Mutator;
+
+    fn eval_helper<'guard>(
+        mem: &'guard MutatorView,
+        thread: ScopedPtr<'guard, Thread>,
+        code: &str,
+    ) -> Result<TaggedScopedPtr<'guard>, RuntimeError> {
+        let compiled_code = compile(mem, parse(mem, code)?)?;
+        println!("RUN CODE {}", code);
+        let result = thread.quick_vm_eval(mem, compiled_code)?;
+        println!("RUN RESULT {}", result);
+        Ok(result)
+    }
+
+    fn test_helper(test_fn: fn(&MutatorView) -> Result<(), RuntimeError>) {
+        let mem = Memory::new();
+
+        struct Test {}
+        impl Mutator for Test {
+            type Input = fn(&MutatorView) -> Result<(), RuntimeError>;
+            type Output = ();
+
+            fn run(
+                &self,
+                mem: &MutatorView,
+                test_fn: Self::Input,
+            ) -> Result<Self::Output, RuntimeError> {
+                test_fn(mem)
+            }
+        }
+
+        let test = Test {};
+        mem.mutate(&test, test_fn).unwrap();
+    }
+
+    #[test]
+    fn compile_add_function() {
+        fn test_inner(mem: &MutatorView) -> Result<(), RuntimeError> {
+            // this test calls a function from another function
+            let code = "(+ 1 2)";
+
+            let t = Thread::alloc(mem)?;
+            let result = eval_helper(mem, t, code)?;
+
+            assert!(result == mem.number(3));
+
+            Ok(())
+        }
+
+        test_helper(test_inner);
+    }
+}

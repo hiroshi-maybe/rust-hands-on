@@ -368,4 +368,11 @@ mod test {
         let expect = String::from("(a)");
         check(&input, &expect);
     }
+
+    #[test]
+    fn parse_number() {
+        let input = String::from("(+ 1 2)");
+        let expect = String::from("(+ 1 2)");
+        check(&input, &expect);
+    }
 }
