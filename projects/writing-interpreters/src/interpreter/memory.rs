@@ -54,6 +54,10 @@ impl<'memory> MutatorView<'memory> {
         TaggedScopedPtr::new(self, self.heap.lookup_sym(name))
     }
 
+    pub fn number(&self, value: isize) -> TaggedScopedPtr<'_> {
+        TaggedScopedPtr::new(self, TaggedPtr::number(value))
+    }
+
     /// Return a nil-initialized runtime-tagged pointer
     pub fn nil(&self) -> TaggedScopedPtr<'_> {
         TaggedScopedPtr::new(self, TaggedPtr::nil())

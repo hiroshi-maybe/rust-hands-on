@@ -66,6 +66,14 @@ where
                 Ok(mem.lookup_sym(name))
             }
         }
+        // Number
+        Some(&&Token {
+            token: Number(ref number),
+            pos: _,
+        }) => {
+            tokens.next();
+            Ok(mem.number(*number))
+        }
         None => {
             tokens.next();
             Ok(mem.nil())
@@ -134,6 +142,13 @@ where
             // Symbol
             Some(&&Token {
                 token: Symbol(_),
+                pos,
+            }) => {
+                list.push(mem, parse_sexpr(mem, tokens)?, pos)?;
+            }
+            // Number
+            Some(&&Token {
+                token: Number(_),
                 pos,
             }) => {
                 list.push(mem, parse_sexpr(mem, tokens)?, pos)?;

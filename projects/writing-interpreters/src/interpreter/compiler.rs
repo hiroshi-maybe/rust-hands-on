@@ -267,6 +267,11 @@ impl<'parent> Compiler<'parent> {
                     test1,
                     test2,
                 }),
+                "+" => self.push_op3(mem, args, |dest, reg1, reg2| Opcode::Add {
+                    dest,
+                    left: reg1,
+                    right: reg2,
+                }),
                 "set" => self.compile_apply_assign(mem, args),
                 "def" => self.compile_named_function(mem, args),
                 // ANCHOR: DefCompileApplyLambda

@@ -20,6 +20,7 @@ pub enum TokenType {
     CloseParen,
     Symbol(String),
     Dot,
+    Number(isize),
     // Text(String),
     // Quote,
 }
@@ -110,10 +111,17 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, RuntimeError> {
                     }
                 }
 
-                tokens.push(Token::new(
-                    spos(line, symbol_start_column),
-                    TokenType::Symbol(symbol),
-                ));
+                if let Ok(number) = symbol.parse::<isize>() {
+                    tokens.push(Token::new(
+                        spos(line, symbol_start_column),
+                        TokenType::Number(number),
+                    ));
+                } else {
+                    tokens.push(Token::new(
+                        spos(line, symbol_start_column),
+                        TokenType::Symbol(symbol),
+                    ));
+                }
             }
             None => {
                 // EOF
