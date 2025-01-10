@@ -128,6 +128,12 @@ pub enum Opcode {
         left: Register,
         right: Register,
     },
+    Mul {
+        // 3 bytes
+        dest: Register,
+        left: Register,
+        right: Register,
+    },
     LoadLiteral {
         // 3 bytes
         dest: Register,

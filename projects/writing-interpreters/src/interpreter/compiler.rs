@@ -272,6 +272,11 @@ impl<'parent> Compiler<'parent> {
                     left: reg1,
                     right: reg2,
                 }),
+                "*" => self.push_op3(mem, args, |dest, reg1, reg2| Opcode::Mul {
+                    dest,
+                    left: reg1,
+                    right: reg2,
+                }),
                 "set" => self.compile_apply_assign(mem, args),
                 "def" => self.compile_named_function(mem, args),
                 // ANCHOR: DefCompileApplyLambda
@@ -900,6 +905,130 @@ mod integration {
             let result = eval_helper(mem, t, query)?;
 
             assert!(result == mem.number(6));
+
+            Ok(())
+        }
+
+        test_helper(test_inner);
+    }
+
+    #[test]
+    fn compile_mul_function() {
+        fn test_inner(mem: &MutatorView) -> Result<(), RuntimeError> {
+            // this test calls a function from another function
+            let code = "(* 3 4)";
+
+            let t = Thread::alloc(mem)?;
+            let result = eval_helper(mem, t, code)?;
+
+            assert!(result == mem.number(12));
+
+            Ok(())
+        }
+
+        test_helper(test_inner);
+    }
+
+    #[test]
+    fn compile_recursive_factorial() {
+        fn test_inner(mem: &MutatorView) -> Result<(), RuntimeError> {
+            // this test calls a function from another function
+            let def_fn = "(def fact (n) (cond (is? n 0) 1 true (* n (fact (+ n -1)))))";
+            let query = "(fact 4)";
+            // (fact 4) = 4 * (fact 3) = 4 * (3 * (fact 2)) = 4 * (3 * (2 * (fact 1))) = 4 * (3 * (2 * (1 * (fact 0)))) = 4 * (3 * (2 * (1 * 1))) = 24
+
+            let t = Thread::alloc(mem)?;
+            eval_helper(mem, t, def_fn)?;
+            let result = eval_helper(mem, t, query)?;
+
+            assert!(result == mem.number(24));
+
+            Ok(())
+        }
+
+        test_helper(test_inner);
+    }
+
+    #[test]
+    fn compile_let_expression() {
+        fn test_inner(mem: &MutatorView) -> Result<(), RuntimeError> {
+            // this test calls a function from another function
+            let code = "(let ((x 1) (y 2)) (+ x y))";
+
+            let t = Thread::alloc(mem)?;
+            let result = eval_helper(mem, t, code)?;
+
+            assert!(result == mem.number(3));
+
+            Ok(())
+        }
+
+        test_helper(test_inner);
+    }
+
+    #[test]
+    fn compile_let_lambda_expression() {
+        fn test_inner(mem: &MutatorView) -> Result<(), RuntimeError> {
+            // this test calls a function from another function
+            let code = "(let ((f (lambda () 1))) (f))";
+
+            let t = Thread::alloc(mem)?;
+            let result = eval_helper(mem, t, code)?;
+
+            assert!(result == mem.number(1));
+
+            Ok(())
+        }
+
+        test_helper(test_inner);
+    }
+
+    #[test]
+    fn compile_let_lambda_arg_expression() {
+        fn test_inner(mem: &MutatorView) -> Result<(), RuntimeError> {
+            // this test calls a function from another function
+            let code = "(let ((f (lambda (x) (+ x 1)))) (f 2))";
+
+            let t = Thread::alloc(mem)?;
+            let result = eval_helper(mem, t, code)?;
+
+            assert!(result == mem.number(3));
+
+            Ok(())
+        }
+
+        test_helper(test_inner);
+    }
+
+    #[test]
+    fn compile_let_lambda_arg_2_expression() {
+        fn test_inner(mem: &MutatorView) -> Result<(), RuntimeError> {
+            // this test calls a function from another function
+            let code = "(let ((f (lambda (x y) (+ x y)))) (f 2 3))";
+
+            let t = Thread::alloc(mem)?;
+            let result = eval_helper(mem, t, code)?;
+
+            assert!(result == mem.number(5));
+
+            Ok(())
+        }
+
+        test_helper(test_inner);
+    }
+
+    #[test]
+    fn compile_inner_let_lambda_arg_2_expression() {
+        fn test_inner(mem: &MutatorView) -> Result<(), RuntimeError> {
+            let def_fn = "(def fact (a) (let ((f (lambda (x y) (+ x y)))) (f 2 a)))";
+
+            let query = "(fact 3)";
+
+            let t = Thread::alloc(mem)?;
+            eval_helper(mem, t, def_fn)?;
+            let result = eval_helper(mem, t, query)?;
+
+            assert!(result == mem.number(5));
 
             Ok(())
         }

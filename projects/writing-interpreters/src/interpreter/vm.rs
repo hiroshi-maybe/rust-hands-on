@@ -275,6 +275,19 @@ impl Thread {
                     let result = TaggedScopedPtr::new(mem, TaggedPtr::number(result));
                     window[dest as usize].set(result);
                 }
+                Opcode::Mul { dest, left, right } => {
+                    let left = match *window[left as usize].get(mem) {
+                        Value::Number(n) => n,
+                        _ => todo!(),
+                    };
+                    let right = match *window[right as usize].get(mem) {
+                        Value::Number(n) => n,
+                        _ => todo!(),
+                    };
+                    let result = left * right;
+                    let result = TaggedScopedPtr::new(mem, TaggedPtr::number(result));
+                    window[dest as usize].set(result);
+                }
                 // Load a literal into a register from the function literals array
                 Opcode::LoadLiteral { dest, literal } => {
                     let literal_ptr = instr.get_literal(mem, literal)?;
@@ -719,6 +732,7 @@ fn env_upvalue_lookup<'guard>(
     closure_env: TaggedScopedPtr<'guard>,
     upvalue_id: u8,
 ) -> Result<ScopedPtr<'guard, Upvalue>, RuntimeError> {
+    println!("env_upvalue_lookup: {:?}", upvalue_id);
     match *closure_env {
         Value::List(env) => {
             let upvalue_ptr = IndexedAnyContainer::get(&*env, guard, upvalue_id as ArraySize)?;
