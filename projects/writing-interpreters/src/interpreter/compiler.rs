@@ -886,4 +886,24 @@ mod integration {
 
         test_helper(test_inner);
     }
+
+    #[test]
+    fn compile_recursive_function() {
+        fn test_inner(mem: &MutatorView) -> Result<(), RuntimeError> {
+            // this test calls a function from another function
+            let def_fn = "(def sum (n) (cond (is? n 0) 0 true (+ n (sum (+ n -1)))))";
+            let query = "(sum 3)";
+            // (sum 3) = 3 + (sum 2) = 3 + (2 + (sum 1)) = 3 + (2 + (1 + (sum 0))) = 3 + (2 + (1 + 0)) = 6
+
+            let t = Thread::alloc(mem)?;
+            eval_helper(mem, t, def_fn)?;
+            let result = eval_helper(mem, t, query)?;
+
+            assert!(result == mem.number(6));
+
+            Ok(())
+        }
+
+        test_helper(test_inner);
+    }
 }
