@@ -1,4 +1,4 @@
-# Not only "the book"
+# Summary
 This is a monolithic repository with projects for hands-on tutorials and books for Rust
 
 # Projects
