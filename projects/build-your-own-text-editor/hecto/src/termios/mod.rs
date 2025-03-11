@@ -23,19 +23,29 @@ extern "C" {
 const ECHO: c_ulong = 0o10;
 const ICANON: c_ulong = 0x00000100;
 const ISIG: c_ulong = 0x00000080;
+const IXON: c_ulong = 0x00000200;
+const IEXTEN: c_ulong = 0x00000400;
+const ICRNL: c_ulong = 0x00000100;
+const OPOST: c_ulong = 0x00000001;
+const BRKINT: c_ulong = 0x00000002;
+const INPCK: c_ulong = 0x00000010;
+const ISTRIP: c_ulong = 0x00000020;
+const CS8: c_ulong = 0x00000300;
+const LFLAG_MASK: c_ulong =
+    ECHO | ICANON | ISIG | IXON | IEXTEN | ICRNL | OPOST | BRKINT | INPCK | ISTRIP | CS8;
 
 const STDIN_FILENO: c_int = 0;
 const TCSAFLUSH: c_int = 2;
 
 pub fn enable_raw_mode() -> Result<(), c_int> {
-    update_termios_lflag(|lflag| lflag & !(ECHO | ICANON | ISIG))?;
+    update_termios_lflag(|lflag| lflag & !LFLAG_MASK)?;
     register_exit_cleanup()?;
 
     Ok(())
 }
 
 pub fn disable_raw_mode() -> Result<(), c_int> {
-    update_termios_lflag(|lflag| lflag | ECHO | ICANON | ISIG)
+    update_termios_lflag(|lflag| lflag | LFLAG_MASK)
 }
 
 extern "C" fn disable_raw_mode_on_exit() {
