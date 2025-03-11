@@ -3,6 +3,7 @@ use std::os::raw::{c_int, c_ulong};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[cfg(target_os = "macos")]
 struct Termios {
     c_iflag: c_ulong,
     c_oflag: c_ulong,
@@ -14,14 +15,43 @@ struct Termios {
 }
 
 extern "C" {
+    fn atexit(func: extern "C" fn()) -> c_int;
     fn tcgetattr(fd: c_int, termios_p: *mut Termios) -> c_int;
     fn tcsetattr(fd: c_int, optional_actions: c_int, termios_p: *const Termios) -> c_int;
 }
 
 const STDIN_FILENO: c_int = 0;
-const TCSANOW: c_int = 0;
+const ECHO: c_ulong = 0o10;
+const TCSAFLUSH: c_int = 2;
 
 pub fn enable_raw_mode() -> Result<(), c_int> {
+    update_termios_lflag(|lflag| lflag & !ECHO)?;
+    register_exit_cleanup()?;
+
+    Ok(())
+}
+
+pub fn disable_raw_mode() -> Result<(), c_int> {
+    update_termios_lflag(|lflag| lflag | ECHO)
+}
+
+extern "C" fn disable_raw_mode_on_exit() {
+    disable_raw_mode().expect("failed to disable raw mode");
+    println!("disabled raw mode on exit");
+}
+
+fn register_exit_cleanup() -> Result<(), c_int> {
+    unsafe {
+        let res = atexit(disable_raw_mode_on_exit);
+        if res != 0 {
+            return Err(res);
+        }
+    }
+
+    Ok(())
+}
+
+fn update_termios_lflag<T: FnOnce(c_ulong) -> c_ulong>(f: T) -> Result<(), c_int> {
     unsafe {
         let mut termios = MaybeUninit::<Termios>::uninit();
         let result = tcgetattr(STDIN_FILENO, termios.as_mut_ptr());
@@ -30,19 +60,12 @@ pub fn enable_raw_mode() -> Result<(), c_int> {
         }
         let mut termios = termios.assume_init();
 
-        dbg!(result);
-        println!("Before modification: c_lflag = {:X}", termios.c_lflag);
+        termios.c_lflag = f(termios.c_lflag);
 
-        termios.c_lflag &= !0o10;
-
-        dbg!(termios.c_lflag);
-
-        let result = tcsetattr(STDIN_FILENO, TCSANOW, &termios);
+        let result = tcsetattr(STDIN_FILENO, TCSAFLUSH, &termios);
         if result == -1 {
             return Err(result);
         }
-
-        println!("After modification: c_lflag = {:X}", termios.c_lflag);
 
         Ok(())
     }
