@@ -9,16 +9,19 @@ fn main() {
     let stdin = std::io::stdin();
     let mut handle = stdin.lock();
 
-    while handle.read(&mut buffer).is_ok_and(|n| n == 1) {
-        let c = buffer[0] as char;
-        if c == 'q' {
-            break;
-        }
+    loop {
+        buffer[0] = '\0' as u8;
+        let _ = handle.read(&mut buffer).is_ok_and(|n| n == 1);
 
+        let c = buffer[0] as char;
         if c.is_ascii_control() {
             println!("{}", c as u8);
         } else {
             println!("{} ('{}')", c as u8, c as char);
+        }
+
+        if c == 'q' {
+            break;
         }
     }
 }

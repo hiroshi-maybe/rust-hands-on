@@ -37,15 +37,25 @@ const LFLAG_MASK: c_ulong =
 const STDIN_FILENO: c_int = 0;
 const TCSAFLUSH: c_int = 2;
 
+const VMIN: usize = 16;
+const VTIME: usize = 17;
+
 pub fn enable_raw_mode() -> Result<(), c_int> {
-    update_termios_lflag(|lflag| lflag & !LFLAG_MASK)?;
+    update_termios_lflag(
+        |lflag| lflag & !LFLAG_MASK,
+        |mut cc| {
+            cc[VMIN] = 0;
+            cc[VTIME] = 1;
+            cc
+        },
+    )?;
     register_exit_cleanup()?;
 
     Ok(())
 }
 
 pub fn disable_raw_mode() -> Result<(), c_int> {
-    update_termios_lflag(|lflag| lflag | LFLAG_MASK)
+    update_termios_lflag(|lflag| lflag | LFLAG_MASK, |cc| cc)
 }
 
 extern "C" fn disable_raw_mode_on_exit() {
@@ -64,7 +74,10 @@ fn register_exit_cleanup() -> Result<(), c_int> {
     Ok(())
 }
 
-fn update_termios_lflag<T: FnOnce(c_ulong) -> c_ulong>(f: T) -> Result<(), c_int> {
+fn update_termios_lflag<T: FnOnce(c_ulong) -> c_ulong, U: FnOnce([u8; 20]) -> [u8; 20]>(
+    f: T,
+    g: U,
+) -> Result<(), c_int> {
     unsafe {
         let mut termios = MaybeUninit::<Termios>::uninit();
         let result = tcgetattr(STDIN_FILENO, termios.as_mut_ptr());
@@ -74,6 +87,7 @@ fn update_termios_lflag<T: FnOnce(c_ulong) -> c_ulong>(f: T) -> Result<(), c_int
         let mut termios = termios.assume_init();
 
         termios.c_lflag = f(termios.c_lflag);
+        termios.c_cc = g(termios.c_cc);
 
         let result = tcsetattr(STDIN_FILENO, TCSAFLUSH, &termios);
         if result == -1 {
