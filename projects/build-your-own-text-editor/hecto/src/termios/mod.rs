@@ -20,12 +20,14 @@ extern "C" {
     fn tcsetattr(fd: c_int, optional_actions: c_int, termios_p: *const Termios) -> c_int;
 }
 
-const STDIN_FILENO: c_int = 0;
 const ECHO: c_ulong = 0o10;
+const ICANON: c_ulong = 0x00000100;
+
+const STDIN_FILENO: c_int = 0;
 const TCSAFLUSH: c_int = 2;
 
 pub fn enable_raw_mode() -> Result<(), c_int> {
-    update_termios_lflag(|lflag| lflag & !ECHO)?;
+    update_termios_lflag(|lflag| lflag & !(ECHO | ICANON))?;
     register_exit_cleanup()?;
 
     Ok(())
