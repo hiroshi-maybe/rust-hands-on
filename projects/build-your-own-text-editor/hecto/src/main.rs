@@ -24,8 +24,12 @@ fn main() {
             print!("{} ('{}')\r\n", c as u8, c as char);
         }
 
-        if c == 'q' {
+        if c == ctrl_key('q') {
             break;
         }
     }
+}
+
+fn ctrl_key(c: char) -> char {
+    (c as u8 & 0x1f) as char
 }
