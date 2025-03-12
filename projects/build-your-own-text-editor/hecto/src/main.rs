@@ -1,10 +1,12 @@
 use std::io::Read;
 
+use hecto::stdio::refresh_screen;
 use hecto::termios::enable_raw_mode;
 
 fn main() {
     enable_raw_mode().expect("failed to enable raw mode");
 
+    refresh_screen();
     loop {
         if process_keypress() {
             break;
@@ -26,11 +28,13 @@ fn process_keypress() -> bool {
         print!("{} ('{}')\r\n", c as u8, c as char);
     }
 
-    if c == ctrl_key('q') {
-        return true;
+    match c {
+        c if c == ctrl_key('q') => {
+            refresh_screen();
+            return true;
+        }
+        _ => false,
     }
-
-    false
 }
 
 fn ctrl_key(c: char) -> char {
