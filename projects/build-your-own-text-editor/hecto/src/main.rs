@@ -14,10 +14,14 @@ fn main() {
         let _ = handle.read(&mut buffer).is_ok_and(|n| n == 1);
 
         let c = buffer[0] as char;
+        if c == '\0' {
+            continue;
+        }
+
         if c.is_ascii_control() {
-            println!("{}", c as u8);
+            print!("{}\r\n", c as u8);
         } else {
-            println!("{} ('{}')", c as u8, c as char);
+            print!("{} ('{}')\r\n", c as u8, c as char);
         }
 
         if c == 'q' {

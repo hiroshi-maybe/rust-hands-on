@@ -31,8 +31,10 @@ const BRKINT: c_ulong = 0x00000002;
 const INPCK: c_ulong = 0x00000010;
 const ISTRIP: c_ulong = 0x00000020;
 const CS8: c_ulong = 0x00000300;
-const LFLAG_MASK: c_ulong =
-    ECHO | ICANON | ISIG | IXON | IEXTEN | ICRNL | OPOST | BRKINT | INPCK | ISTRIP | CS8;
+const IFLAG_MASK: c_ulong = BRKINT | ICRNL | INPCK | ISTRIP | IXON;
+const OFLAG_MASK: c_ulong = OPOST;
+const CFLAG_MASK: c_ulong = CS8;
+const LFLAG_MASK: c_ulong = ECHO | ICANON | IEXTEN | ISIG;
 
 const STDIN_FILENO: c_int = 0;
 const TCSAFLUSH: c_int = 2;
@@ -41,7 +43,10 @@ const VMIN: usize = 16;
 const VTIME: usize = 17;
 
 pub fn enable_raw_mode() -> Result<(), c_int> {
-    update_termios_lflag(
+    update_termios(
+        |iflag| iflag & !IFLAG_MASK,
+        |oflag| oflag & !OFLAG_MASK,
+        |cflag| cflag | CFLAG_MASK,
         |lflag| lflag & !LFLAG_MASK,
         |mut cc| {
             cc[VMIN] = 0;
@@ -55,7 +60,13 @@ pub fn enable_raw_mode() -> Result<(), c_int> {
 }
 
 pub fn disable_raw_mode() -> Result<(), c_int> {
-    update_termios_lflag(|lflag| lflag | LFLAG_MASK, |cc| cc)
+    update_termios(
+        |iflag| iflag | IFLAG_MASK,
+        |oflag| oflag | OFLAG_MASK,
+        |cflag| cflag,
+        |lflag| lflag | LFLAG_MASK,
+        |cc| cc,
+    )
 }
 
 extern "C" fn disable_raw_mode_on_exit() {
@@ -74,9 +85,12 @@ fn register_exit_cleanup() -> Result<(), c_int> {
     Ok(())
 }
 
-fn update_termios_lflag<T: FnOnce(c_ulong) -> c_ulong, U: FnOnce([u8; 20]) -> [u8; 20]>(
-    f: T,
-    g: U,
+fn update_termios(
+    i_flag: impl FnOnce(c_ulong) -> c_ulong,
+    o_flag: impl FnOnce(c_ulong) -> c_ulong,
+    c_flag: impl FnOnce(c_ulong) -> c_ulong,
+    l_flag: impl FnOnce(c_ulong) -> c_ulong,
+    cc: impl FnOnce([u8; 20]) -> [u8; 20],
 ) -> Result<(), c_int> {
     unsafe {
         let mut termios = MaybeUninit::<Termios>::uninit();
@@ -86,8 +100,11 @@ fn update_termios_lflag<T: FnOnce(c_ulong) -> c_ulong, U: FnOnce([u8; 20]) -> [u
         }
         let mut termios = termios.assume_init();
 
-        termios.c_lflag = f(termios.c_lflag);
-        termios.c_cc = g(termios.c_cc);
+        termios.c_iflag = i_flag(termios.c_iflag);
+        termios.c_oflag = o_flag(termios.c_oflag);
+        termios.c_cflag = c_flag(termios.c_cflag);
+        termios.c_lflag = l_flag(termios.c_lflag);
+        termios.c_cc = cc(termios.c_cc);
 
         let result = tcsetattr(STDIN_FILENO, TCSAFLUSH, &termios);
         if result == -1 {
