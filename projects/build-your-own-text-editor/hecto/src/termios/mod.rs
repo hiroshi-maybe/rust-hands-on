@@ -1,5 +1,6 @@
 use std::mem::MaybeUninit;
 use std::os::raw::{c_int, c_ulong};
+use std::sync::Mutex;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -43,6 +44,14 @@ const VMIN: usize = 16;
 const VTIME: usize = 17;
 
 pub fn enable_raw_mode() -> Result<(), c_int> {
+    let mut original_termios = TERMINAL_MODE_PRIOR_RAW_MODE.lock().unwrap();
+    if original_termios.is_some() {
+        println!("raw mode already enabled");
+        return Ok(());
+    }
+
+    *original_termios = get_termios().ok();
+
     update_termios(
         |iflag| iflag & !IFLAG_MASK,
         |oflag| oflag & !OFLAG_MASK,
@@ -60,14 +69,18 @@ pub fn enable_raw_mode() -> Result<(), c_int> {
 }
 
 pub fn disable_raw_mode() -> Result<(), c_int> {
-    update_termios(
-        |iflag| iflag | IFLAG_MASK,
-        |oflag| oflag | OFLAG_MASK,
-        |cflag| cflag,
-        |lflag| lflag | LFLAG_MASK,
-        |cc| cc,
-    )
+    let mut original_mode = TERMINAL_MODE_PRIOR_RAW_MODE.lock().unwrap();
+    if let Some(termios) = original_mode.take() {
+        set_termios(&termios)?;
+        *original_mode = None;
+    }
+
+    Ok(())
 }
+
+// Some(Termios) -> we're in the raw mode and this is the previous mode
+// None -> we're not in the raw mode
+static TERMINAL_MODE_PRIOR_RAW_MODE: Mutex<Option<Termios>> = Mutex::new(None);
 
 extern "C" fn disable_raw_mode_on_exit() {
     disable_raw_mode().expect("failed to disable raw mode");
@@ -92,21 +105,32 @@ fn update_termios(
     l_flag: impl FnOnce(c_ulong) -> c_ulong,
     cc: impl FnOnce([u8; 20]) -> [u8; 20],
 ) -> Result<(), c_int> {
+    let mut termios = get_termios()?;
+
+    termios.c_iflag = i_flag(termios.c_iflag);
+    termios.c_oflag = o_flag(termios.c_oflag);
+    termios.c_cflag = c_flag(termios.c_cflag);
+    termios.c_lflag = l_flag(termios.c_lflag);
+    termios.c_cc = cc(termios.c_cc);
+
+    set_termios(&termios)
+}
+
+fn get_termios() -> Result<Termios, c_int> {
     unsafe {
         let mut termios = MaybeUninit::<Termios>::uninit();
         let result = tcgetattr(STDIN_FILENO, termios.as_mut_ptr());
         if result == -1 {
             return Err(result);
         }
-        let mut termios = termios.assume_init();
 
-        termios.c_iflag = i_flag(termios.c_iflag);
-        termios.c_oflag = o_flag(termios.c_oflag);
-        termios.c_cflag = c_flag(termios.c_cflag);
-        termios.c_lflag = l_flag(termios.c_lflag);
-        termios.c_cc = cc(termios.c_cc);
+        Ok(termios.assume_init())
+    }
+}
 
-        let result = tcsetattr(STDIN_FILENO, TCSAFLUSH, &termios);
+fn set_termios(termios: &Termios) -> Result<(), c_int> {
+    unsafe {
+        let result = tcsetattr(STDIN_FILENO, TCSAFLUSH, termios);
         if result == -1 {
             return Err(result);
         }
