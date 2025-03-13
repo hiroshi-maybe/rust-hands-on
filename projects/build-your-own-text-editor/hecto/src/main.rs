@@ -50,6 +50,17 @@ fn refresh_screen() {
     write_command(clear_screen_cmd);
     let reposition_cursor_cmd = b"\x1b[H";
     write_command(reposition_cursor_cmd);
+
+    draw_rows();
+
+    write_command(reposition_cursor_cmd);
+}
+
+fn draw_rows() {
+    let placeholder_tilde_line = b"~\r\n";
+    for _ in 0..24 {
+        write_command(placeholder_tilde_line);
+    }
 }
 
 // endregion: output
