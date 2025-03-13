@@ -7,14 +7,7 @@ extern "C" {
 
 const STDOUT_FILENO: RawFd = 1;
 
-pub fn refresh_screen() {
-    let clear_screen_cmd = b"\x1b[2J";
-    write_command(clear_screen_cmd);
-    let reposition_cursor_cmd = b"\x1b[H";
-    write_command(reposition_cursor_cmd);
-}
-
-fn write_command(cmd: &[u8]) {
+pub fn write_command(cmd: &[u8]) {
     unsafe {
         write(STDOUT_FILENO, cmd.as_ptr(), cmd.len());
     }

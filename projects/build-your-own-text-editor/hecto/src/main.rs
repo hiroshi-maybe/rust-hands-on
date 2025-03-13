@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use hecto::stdio::refresh_screen;
+use hecto::stdio::write_command;
 use hecto::termios::enable_raw_mode;
 
 fn main() {
@@ -42,6 +42,17 @@ fn ctrl_key(c: char) -> char {
 }
 
 // endregion: input
+
+// region: output
+
+fn refresh_screen() {
+    let clear_screen_cmd = b"\x1b[2J";
+    write_command(clear_screen_cmd);
+    let reposition_cursor_cmd = b"\x1b[H";
+    write_command(reposition_cursor_cmd);
+}
+
+// endregion: output
 
 // region: terminal
 
