@@ -68,7 +68,7 @@ pub fn enable_raw_mode() -> Result<(), c_int> {
     Ok(())
 }
 
-pub fn disable_raw_mode() -> Result<(), c_int> {
+fn disable_raw_mode() -> Result<(), c_int> {
     let mut original_mode = TERMINAL_MODE_PRIOR_RAW_MODE.lock().unwrap();
     if let Some(termios) = original_mode.take() {
         set_termios(&termios)?;
