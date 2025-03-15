@@ -8,8 +8,7 @@ fn main() {
     enable_raw_mode().expect("failed to enable raw mode");
     let config = EditorConfig::new().expect("failed to initialize editor config");
 
-    dbg!(config.screen_cols, config.screen_rows);
-    refresh_screen(&config);
+    refresh_screen(&config).expect("failed to refresh screen");
     loop {
         if process_keypress(&config) {
             break;
@@ -39,7 +38,7 @@ impl EditorConfig {
 // region: input
 
 fn process_keypress(config: &EditorConfig) -> bool {
-    let c = read_key();
+    let c: char = read_key();
     if c == '\0' {
         return false;
     }
@@ -51,10 +50,7 @@ fn process_keypress(config: &EditorConfig) -> bool {
     }
 
     match c {
-        c if c == ctrl_key('q') => {
-            refresh_screen(config);
-            return true;
-        }
+        c if c == ctrl_key('q') => refresh_screen(config).is_ok(),
         _ => false,
     }
 }
@@ -67,22 +63,26 @@ fn ctrl_key(c: char) -> char {
 
 // region: output
 
-fn refresh_screen(config: &EditorConfig) {
+fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
     let clear_screen_cmd = b"\x1b[2J";
-    write_command(clear_screen_cmd);
+    write_command(clear_screen_cmd)?;
     let reposition_cursor_cmd = b"\x1b[H";
-    write_command(reposition_cursor_cmd);
+    write_command(reposition_cursor_cmd)?;
 
-    draw_rows(config);
+    draw_rows(config)?;
 
-    write_command(reposition_cursor_cmd);
+    write_command(reposition_cursor_cmd)?;
+
+    Ok(())
 }
 
-fn draw_rows(config: &EditorConfig) {
+fn draw_rows(config: &EditorConfig) -> Result<(), std::io::Error> {
     let placeholder_tilde_line = b"~\r\n";
     for _ in 0..config.screen_rows {
-        write_command(placeholder_tilde_line);
+        write_command(placeholder_tilde_line)?;
     }
+
+    Ok(())
 }
 
 // endregion: output

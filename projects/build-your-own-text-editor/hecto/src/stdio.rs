@@ -7,8 +7,12 @@ extern "C" {
 
 const STDOUT_FILENO: RawFd = 1;
 
-pub fn write_command(cmd: &[u8]) {
-    unsafe {
-        write(STDOUT_FILENO, cmd.as_ptr(), cmd.len());
+pub fn write_command(cmd: &[u8]) -> Result<(), std::io::Error> {
+    let res = unsafe { write(STDOUT_FILENO, cmd.as_ptr(), cmd.len()) };
+
+    if res != cmd.len() as isize {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
     }
 }
