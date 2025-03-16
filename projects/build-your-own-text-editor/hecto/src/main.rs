@@ -67,8 +67,6 @@ fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
     let mut commmands = BufferedCommands::new();
     let make_cursor_invisible_cmd = b"\x1b[?25l";
     commmands.append(make_cursor_invisible_cmd);
-    let clear_screen_cmd = b"\x1b[2J";
-    commmands.append(clear_screen_cmd);
     let reposition_cursor_cmd = b"\x1b[H";
     commmands.append(reposition_cursor_cmd);
     let make_cursor_visible_cmd = b"\x1b[?25h";
@@ -84,8 +82,10 @@ fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
 
 fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
     let placeholder_tilde_line = b"~";
+    let clear_line_cmd = b"\x1b[K";
     for i in 0..config.screen_rows {
         commands.append(placeholder_tilde_line);
+        commands.append(clear_line_cmd);
 
         if i < config.screen_rows - 1 {
             commands.append(b"\r\n");
