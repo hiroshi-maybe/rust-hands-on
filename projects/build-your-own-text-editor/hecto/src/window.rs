@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use crate::stdio::write_command;
+use crate::stdio::BufferedCommands;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -30,8 +30,9 @@ pub fn get_window_size() -> Result<(usize, usize), std::io::Error> {
 
         if ioctl(STDOUT_FILENO, TIOCGWINSZ, winsize.as_mut_ptr()) == -1 {
             let move_curosor_bottom_right_cmd = b"\x1b[999C\x1b[999B";
-            write_command(move_curosor_bottom_right_cmd)?;
-            return get_cursor_position();
+            let mut commands = BufferedCommands::new();
+            commands.append(move_curosor_bottom_right_cmd);
+            return get_cursor_position(&mut commands);
         }
 
         let winsize = winsize.assume_init();
@@ -39,9 +40,11 @@ pub fn get_window_size() -> Result<(usize, usize), std::io::Error> {
     }
 }
 
-fn get_cursor_position() -> Result<(usize, usize), std::io::Error> {
+fn get_cursor_position(commands: &mut BufferedCommands) -> Result<(usize, usize), std::io::Error> {
     let query_term_status_info_cmd = b"\x1b[6n";
-    write_command(query_term_status_info_cmd)?;
+    commands.append(query_term_status_info_cmd);
+    commands.execute()?;
+
     print!("\r\n");
     let stdin = std::io::stdin();
     let mut handle = stdin.lock();

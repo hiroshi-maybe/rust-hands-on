@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use hecto::stdio::write_command;
+use hecto::stdio::BufferedCommands;
 use hecto::termios::enable_raw_mode;
 use hecto::window::get_window_size;
 
@@ -64,29 +64,29 @@ fn ctrl_key(c: char) -> char {
 // region: output
 
 fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
+    let mut commmands = BufferedCommands::new();
     let clear_screen_cmd = b"\x1b[2J";
-    write_command(clear_screen_cmd)?;
+    commmands.append(clear_screen_cmd);
     let reposition_cursor_cmd = b"\x1b[H";
-    write_command(reposition_cursor_cmd)?;
+    commmands.append(reposition_cursor_cmd);
 
-    draw_rows(config)?;
+    draw_rows(config, &mut commmands);
 
-    write_command(reposition_cursor_cmd)?;
+    commmands.append(reposition_cursor_cmd);
+    commmands.execute()?;
 
     Ok(())
 }
 
-fn draw_rows(config: &EditorConfig) -> Result<(), std::io::Error> {
+fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
     let placeholder_tilde_line = b"~";
     for i in 0..config.screen_rows {
-        write_command(placeholder_tilde_line)?;
+        commands.append(placeholder_tilde_line);
 
         if i < config.screen_rows - 1 {
-            print!("\r\n");
+            commands.append(b"\r\n");
         }
     }
-
-    Ok(())
 }
 
 // endregion: output
