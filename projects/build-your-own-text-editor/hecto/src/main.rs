@@ -77,9 +77,13 @@ fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
 }
 
 fn draw_rows(config: &EditorConfig) -> Result<(), std::io::Error> {
-    let placeholder_tilde_line = b"~\r\n";
-    for _ in 0..config.screen_rows {
+    let placeholder_tilde_line = b"~";
+    for i in 0..config.screen_rows {
         write_command(placeholder_tilde_line)?;
+
+        if i < config.screen_rows - 1 {
+            print!("\r\n");
+        }
     }
 
     Ok(())
