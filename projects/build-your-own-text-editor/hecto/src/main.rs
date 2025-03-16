@@ -65,10 +65,14 @@ fn ctrl_key(c: char) -> char {
 
 fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
     let mut commmands = BufferedCommands::new();
+    let make_cursor_invisible_cmd = b"\x1b[?25l";
+    commmands.append(make_cursor_invisible_cmd);
     let clear_screen_cmd = b"\x1b[2J";
     commmands.append(clear_screen_cmd);
     let reposition_cursor_cmd = b"\x1b[H";
     commmands.append(reposition_cursor_cmd);
+    let make_cursor_visible_cmd = b"\x1b[?25h";
+    commmands.append(make_cursor_visible_cmd);
 
     draw_rows(config, &mut commmands);
 
