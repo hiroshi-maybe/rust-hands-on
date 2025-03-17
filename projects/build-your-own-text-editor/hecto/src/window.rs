@@ -30,8 +30,7 @@ pub fn get_window_size() -> Result<(usize, usize), std::io::Error> {
 
         if ioctl(STDOUT_FILENO, TIOCGWINSZ, winsize.as_mut_ptr()) == -1 {
             let move_curosor_bottom_right_cmd = b"\x1b[999C\x1b[999B";
-            let mut commands = BufferedCommands::new();
-            commands.append(move_curosor_bottom_right_cmd);
+            let mut commands = BufferedCommands::new(move_curosor_bottom_right_cmd.to_vec());
             return get_cursor_position(&mut commands);
         }
 

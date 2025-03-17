@@ -6,8 +6,8 @@ pub struct BufferedCommands {
 }
 
 impl BufferedCommands {
-    pub fn new() -> Self {
-        Self { buffer: Vec::new() }
+    pub fn new(commands: Vec<u8>) -> Self {
+        Self { buffer: commands }
     }
 
     pub fn append(&mut self, cmd: &[u8]) {
