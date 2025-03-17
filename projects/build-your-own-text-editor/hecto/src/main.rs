@@ -7,6 +7,7 @@ use hecto::window::get_window_size;
 fn main() {
     enable_raw_mode().expect("failed to enable raw mode");
     let mut config = EditorConfig::new().expect("failed to initialize editor config");
+    editor_open(&mut config);
 
     loop {
         refresh_screen(&config).expect("failed to refresh screen");
@@ -17,6 +18,16 @@ fn main() {
 }
 
 // region: defines
+
+struct EditorRow {
+    chars: Vec<char>,
+}
+
+impl EditorRow {
+    fn new() -> Self {
+        Self { chars: Vec::new() }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 enum EditorKey {
@@ -49,6 +60,7 @@ enum PageDirection {
 struct EditorConfig {
     cx: usize,
     cy: usize,
+    rows: Vec<EditorRow>,
     screen_rows: usize,
     screen_cols: usize,
 }
@@ -59,6 +71,7 @@ impl EditorConfig {
         Ok(Self {
             cx: 0,
             cy: 0,
+            rows: vec![],
             screen_rows,
             screen_cols,
         })
@@ -143,31 +156,54 @@ fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
 }
 
 fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
-    let placeholder_tilde_line = b"~";
-    let clear_line_cmd = b"\x1b[K";
-    for i in 0..config.screen_rows {
-        if i == config.screen_rows / 3 {
-            let greeting = "Kilo editor -- version ".to_string() + env!("CARGO_PKG_VERSION");
-            let mut padding = (config.screen_cols - greeting.len()) / 2;
-            if padding > 0 {
+    for y in 0..config.screen_rows {
+        if y >= config.rows.len() {
+            if y == config.screen_rows / 3 {
+                draw_welcome_greeting(config, commands);
+            } else {
+                let placeholder_tilde_line = b"~";
                 commands.append(placeholder_tilde_line);
-                padding -= 1;
             }
-            for _ in 0..padding {
-                commands.append(&[b' ']);
-            }
-            commands.append(greeting.bytes().collect::<Vec<_>>().as_slice());
         } else {
-            commands.append(placeholder_tilde_line);
+            let len = config.rows[y].chars.len().min(config.screen_cols);
+            let line = &config.rows[y].chars[..len];
+            commands.append(line.iter().collect::<String>().as_bytes());
         }
+
+        let clear_line_cmd = b"\x1b[K";
         commands.append(clear_line_cmd);
-        if i < config.screen_rows - 1 {
+        if y < config.screen_rows - 1 {
             commands.append(b"\r\n");
         }
     }
 }
 
+fn draw_welcome_greeting(config: &EditorConfig, commands: &mut BufferedCommands) {
+    let greeting = "Kilo editor -- version ".to_string() + env!("CARGO_PKG_VERSION");
+    let mut padding = (config.screen_cols - greeting.len()) / 2;
+    if padding > 0 {
+        let placeholder_tilde_line = b"~";
+        commands.append(placeholder_tilde_line);
+        padding -= 1;
+    }
+    for _ in 0..padding {
+        commands.append(&[b' ']);
+    }
+    commands.append(greeting.bytes().collect::<Vec<_>>().as_slice());
+}
+
 // endregion: output
+
+// region: file i/o
+
+fn editor_open(config: &mut EditorConfig) {
+    let mut row = EditorRow::new();
+    let line = "Hello, world!";
+    row.chars.extend(line.chars());
+    config.rows.push(row);
+}
+
+// endregion: file i/o
 
 // region: terminal
 
