@@ -21,6 +21,7 @@ fn main() {
 #[derive(Debug)]
 enum EditorKey {
     Arrow(ArrowDirection),
+    Page(PageDirection),
     Char(char),
 }
 
@@ -28,6 +29,12 @@ enum EditorKey {
 enum ArrowDirection {
     Left,
     Right,
+    Up,
+    Down,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PageDirection {
     Up,
     Down,
 }
@@ -85,6 +92,15 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
             return refresh_screen(config).is_ok();
         }
         EditorKey::Arrow(dir) => move_cursor(config, dir),
+        EditorKey::Page(dir) => {
+            let key = match dir {
+                PageDirection::Up => ArrowDirection::Up,
+                PageDirection::Down => ArrowDirection::Down,
+            };
+            for _ in 0..config.screen_rows {
+                move_cursor(config, key);
+            }
+        }
         _ => {}
     }
 
@@ -161,13 +177,27 @@ fn read_key() -> EditorKey {
     // Escape sequence
     if c == '\x1b' {
         let mut seq = [0; 2];
-        if handle.read(&mut seq).is_ok_and(|n| n == 2) && seq[0] == '[' as u8 {
-            match seq[1] {
-                b'A' => EditorKey::Arrow(ArrowDirection::Up),
-                b'B' => EditorKey::Arrow(ArrowDirection::Down),
-                b'C' => EditorKey::Arrow(ArrowDirection::Right),
-                b'D' => EditorKey::Arrow(ArrowDirection::Left),
-                _ => EditorKey::Char('\x1b'),
+        if handle.read(&mut seq).is_ok_and(|n| n == 2) {
+            if seq[0] == b'[' {
+                let mut seq2 = [0; 1];
+                match seq[1] {
+                    b'A' => EditorKey::Arrow(ArrowDirection::Up),
+                    b'B' => EditorKey::Arrow(ArrowDirection::Down),
+                    b'C' => EditorKey::Arrow(ArrowDirection::Right),
+                    b'D' => EditorKey::Arrow(ArrowDirection::Left),
+                    b'5' | b'6'
+                        if handle.read(&mut seq2).is_ok_and(|n| n == 1) && seq2[0] == b'~' =>
+                    {
+                        match seq[1] {
+                            b'5' => EditorKey::Page(PageDirection::Up),
+                            b'6' => EditorKey::Page(PageDirection::Down),
+                            _ => unreachable!(),
+                        }
+                    }
+                    _ => EditorKey::Char('\x1b'),
+                }
+            } else {
+                EditorKey::Char('\x1b')
             }
         } else {
             EditorKey::Char('\x1b')
