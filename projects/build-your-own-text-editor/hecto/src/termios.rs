@@ -84,7 +84,6 @@ static TERMINAL_MODE_PRIOR_RAW_MODE: Mutex<Option<Termios>> = Mutex::new(None);
 
 extern "C" fn disable_raw_mode_on_exit() {
     disable_raw_mode().expect("failed to disable raw mode");
-    println!("disabled raw mode on exit");
 }
 
 fn register_exit_cleanup() -> Result<(), c_int> {

@@ -16,6 +16,24 @@ fn main() {
     }
 }
 
+// region: defines
+
+#[derive(Debug)]
+enum EditorKey {
+    Arrow(ArrowDirection),
+    Char(char),
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ArrowDirection {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+// endregion: defines
+
 // region: data
 
 struct EditorConfig {
@@ -41,18 +59,19 @@ impl EditorConfig {
 
 // region: input
 
-fn move_cursor(config: &mut EditorConfig, c: char) {
-    match c {
-        'a' if config.cx > 0 => {
+fn move_cursor(config: &mut EditorConfig, dir: ArrowDirection) {
+    dbg!(dir);
+    match dir {
+        ArrowDirection::Left if config.cx > 0 => {
             config.cx -= 1;
         }
-        'd' if config.cx < config.screen_cols - 1 => {
+        ArrowDirection::Right if config.cx < config.screen_cols - 1 => {
             config.cx += 1;
         }
-        'w' if config.cy < config.screen_rows - 1 => {
+        ArrowDirection::Down if config.cy < config.screen_rows - 1 => {
             config.cy += 1;
         }
-        's' if config.cy > 0 => {
+        ArrowDirection::Up if config.cy > 0 => {
             config.cy -= 1;
         }
         _ => {}
@@ -60,16 +79,12 @@ fn move_cursor(config: &mut EditorConfig, c: char) {
 }
 
 fn process_keypress(config: &mut EditorConfig) -> bool {
-    let c: char = read_key();
-    if c == '\0' {
-        return false;
-    }
-
+    let c = read_key();
     match c {
-        c if c == ctrl_key('q') => {
+        EditorKey::Char(c) if c == ctrl_key('q') => {
             return refresh_screen(config).is_ok();
         }
-        'a' | 'd' | 'w' | 's' => move_cursor(config, c),
+        EditorKey::Arrow(dir) => move_cursor(config, dir),
         _ => {}
     }
 
@@ -135,13 +150,31 @@ fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
 
 // region: terminal
 
-fn read_key() -> char {
+fn read_key() -> EditorKey {
     let stdin = std::io::stdin();
     let mut handle = stdin.lock();
     let mut buffer = [0; 1];
     buffer[0] = '\0' as u8;
     while !handle.read(&mut buffer).is_ok_and(|n| n == 1) {}
-    buffer[0] as char
+    let c = buffer[0] as char;
+
+    // Escape sequence
+    if c == '\x1b' {
+        let mut seq = [0; 2];
+        if handle.read(&mut seq).is_ok_and(|n| n == 2) && seq[0] == '[' as u8 {
+            match seq[1] {
+                b'A' => EditorKey::Arrow(ArrowDirection::Up),
+                b'B' => EditorKey::Arrow(ArrowDirection::Down),
+                b'C' => EditorKey::Arrow(ArrowDirection::Right),
+                b'D' => EditorKey::Arrow(ArrowDirection::Left),
+                _ => EditorKey::Char('\x1b'),
+            }
+        } else {
+            EditorKey::Char('\x1b')
+        }
+    } else {
+        EditorKey::Char(c)
+    }
 }
 
 // endregion: terminal
