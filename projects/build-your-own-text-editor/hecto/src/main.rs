@@ -9,6 +9,8 @@ fn main() {
     let config = EditorConfig::new().expect("failed to initialize editor config");
 
     refresh_screen(&config).expect("failed to refresh screen");
+    let version = env!("CARGO_PKG_VERSION");
+
     loop {
         if process_keypress(&config) {
             break;
@@ -84,9 +86,21 @@ fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
     let placeholder_tilde_line = b"~";
     let clear_line_cmd = b"\x1b[K";
     for i in 0..config.screen_rows {
-        commands.append(placeholder_tilde_line);
+        if i == config.screen_rows / 3 {
+            let greeting = "Kilo editor -- version ".to_string() + env!("CARGO_PKG_VERSION");
+            let mut padding = (config.screen_cols - greeting.len()) / 2;
+            if padding > 0 {
+                commands.append(placeholder_tilde_line);
+                padding -= 1;
+            }
+            for _ in 0..padding {
+                commands.append(&[b' ']);
+            }
+            commands.append(greeting.bytes().collect::<Vec<_>>().as_slice());
+        } else {
+            commands.append(placeholder_tilde_line);
+        }
         commands.append(clear_line_cmd);
-
         if i < config.screen_rows - 1 {
             commands.append(b"\r\n");
         }
