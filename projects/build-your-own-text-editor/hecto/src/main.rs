@@ -206,12 +206,16 @@ fn editor_open(file_name: &str, config: &mut EditorConfig) -> std::io::Result<()
     let file = File::open(file_name).expect("failed to open file");
     let reader = BufReader::new(file);
     for line in reader.lines() {
-        let row = EditorRow::new(line?.chars().collect());
-        config.rows.push(row);
-        break;
+        let line = line?;
+        editor_append_row(line, config);
     }
 
     Ok(())
+}
+
+fn editor_append_row(line: String, config: &mut EditorConfig) {
+    let row = EditorRow::new(line.trim_end().chars().collect());
+    config.rows.push(row);
 }
 
 // endregion: file i/o
