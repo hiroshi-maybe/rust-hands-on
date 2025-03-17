@@ -6,13 +6,11 @@ use hecto::window::get_window_size;
 
 fn main() {
     enable_raw_mode().expect("failed to enable raw mode");
-    let config = EditorConfig::new().expect("failed to initialize editor config");
-
-    refresh_screen(&config).expect("failed to refresh screen");
-    let version = env!("CARGO_PKG_VERSION");
+    let mut config = EditorConfig::new().expect("failed to initialize editor config");
 
     loop {
-        if process_keypress(&config) {
+        refresh_screen(&config).expect("failed to refresh screen");
+        if process_keypress(&mut config) {
             break;
         }
     }
@@ -21,6 +19,8 @@ fn main() {
 // region: data
 
 struct EditorConfig {
+    cx: usize,
+    cy: usize,
     screen_rows: usize,
     screen_cols: usize,
 }
@@ -29,6 +29,8 @@ impl EditorConfig {
     fn new() -> Result<Self, std::io::Error> {
         let (screen_rows, screen_cols) = get_window_size()?;
         Ok(Self {
+            cx: 0,
+            cy: 0,
             screen_rows,
             screen_cols,
         })
@@ -39,22 +41,39 @@ impl EditorConfig {
 
 // region: input
 
-fn process_keypress(config: &EditorConfig) -> bool {
+fn move_cursor(config: &mut EditorConfig, c: char) {
+    match c {
+        'a' if config.cx > 0 => {
+            config.cx -= 1;
+        }
+        'd' if config.cx < config.screen_cols - 1 => {
+            config.cx += 1;
+        }
+        'w' if config.cy < config.screen_rows - 1 => {
+            config.cy += 1;
+        }
+        's' if config.cy > 0 => {
+            config.cy -= 1;
+        }
+        _ => {}
+    }
+}
+
+fn process_keypress(config: &mut EditorConfig) -> bool {
     let c: char = read_key();
     if c == '\0' {
         return false;
     }
 
-    if c.is_ascii_control() {
-        print!("{}\r\n", c as u8);
-    } else {
-        print!("{} ('{}')\r\n", c as u8, c as char);
+    match c {
+        c if c == ctrl_key('q') => {
+            return refresh_screen(config).is_ok();
+        }
+        'a' | 'd' | 'w' | 's' => move_cursor(config, c),
+        _ => {}
     }
 
-    match c {
-        c if c == ctrl_key('q') => refresh_screen(config).is_ok(),
-        _ => false,
-    }
+    false
 }
 
 fn ctrl_key(c: char) -> char {
@@ -78,7 +97,8 @@ fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
 
     draw_rows(config, &mut commmands);
 
-    commmands.append(reposition_cursor_cmd);
+    let place_cursor_cmd = format!("\x1b[{};{}H", config.cy + 1, config.cx + 1);
+    commmands.append(place_cursor_cmd.as_bytes());
     let make_cursor_visible_cmd = b"\x1b[?25h";
     commmands.append(make_cursor_visible_cmd);
     commmands.execute()?;
