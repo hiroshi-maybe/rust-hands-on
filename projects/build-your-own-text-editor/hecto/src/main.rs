@@ -18,12 +18,13 @@ fn main() {
 
 // region: defines
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum EditorKey {
     Arrow(ArrowDirection),
     Page(PageDirection),
     Home,
     End,
+    Del,
     Char(char),
 }
 
@@ -88,6 +89,7 @@ fn move_cursor(config: &mut EditorConfig, dir: ArrowDirection) {
 
 fn process_keypress(config: &mut EditorConfig) -> bool {
     let c = read_key();
+    dbg!(c.clone());
     match c {
         EditorKey::Char(c) if c == ctrl_key('q') => {
             return refresh_screen(config).is_ok();
@@ -191,12 +193,13 @@ fn read_key() -> EditorKey {
                         b'D' => EditorKey::Arrow(ArrowDirection::Left),
                         b'H' => EditorKey::Home,
                         b'F' => EditorKey::End,
-                        b'1' | b'4' | b'5' | b'6' | b'7' | b'8'
+                        b'1' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8'
                             if handle.read(&mut seq2).is_ok_and(|n| n == 1) && seq2[0] == b'~' =>
                         {
                             match seq[1] {
                                 b'1' | b'7' => EditorKey::Home,
                                 b'4' | b'8' => EditorKey::End,
+                                b'3' => EditorKey::Del,
                                 b'5' => EditorKey::Page(PageDirection::Up),
                                 b'6' => EditorKey::Page(PageDirection::Down),
                                 _ => unreachable!(),
