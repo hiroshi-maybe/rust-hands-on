@@ -22,6 +22,8 @@ fn main() {
 enum EditorKey {
     Arrow(ArrowDirection),
     Page(PageDirection),
+    Home,
+    End,
     Char(char),
 }
 
@@ -67,7 +69,6 @@ impl EditorConfig {
 // region: input
 
 fn move_cursor(config: &mut EditorConfig, dir: ArrowDirection) {
-    dbg!(dir);
     match dir {
         ArrowDirection::Left if config.cx > 0 => {
             config.cx -= 1;
@@ -101,6 +102,8 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
                 move_cursor(config, key);
             }
         }
+        EditorKey::Home => config.cx = 0,
+        EditorKey::End => config.cx = config.screen_cols - 1,
         _ => {}
     }
 
@@ -178,26 +181,36 @@ fn read_key() -> EditorKey {
     if c == '\x1b' {
         let mut seq = [0; 2];
         if handle.read(&mut seq).is_ok_and(|n| n == 2) {
-            if seq[0] == b'[' {
-                let mut seq2 = [0; 1];
-                match seq[1] {
-                    b'A' => EditorKey::Arrow(ArrowDirection::Up),
-                    b'B' => EditorKey::Arrow(ArrowDirection::Down),
-                    b'C' => EditorKey::Arrow(ArrowDirection::Right),
-                    b'D' => EditorKey::Arrow(ArrowDirection::Left),
-                    b'5' | b'6'
-                        if handle.read(&mut seq2).is_ok_and(|n| n == 1) && seq2[0] == b'~' =>
-                    {
-                        match seq[1] {
-                            b'5' => EditorKey::Page(PageDirection::Up),
-                            b'6' => EditorKey::Page(PageDirection::Down),
-                            _ => unreachable!(),
+            match seq[0] {
+                b'[' => {
+                    let mut seq2 = [0; 1];
+                    match seq[1] {
+                        b'A' => EditorKey::Arrow(ArrowDirection::Up),
+                        b'B' => EditorKey::Arrow(ArrowDirection::Down),
+                        b'C' => EditorKey::Arrow(ArrowDirection::Right),
+                        b'D' => EditorKey::Arrow(ArrowDirection::Left),
+                        b'H' => EditorKey::Home,
+                        b'F' => EditorKey::End,
+                        b'1' | b'4' | b'5' | b'6' | b'7' | b'8'
+                            if handle.read(&mut seq2).is_ok_and(|n| n == 1) && seq2[0] == b'~' =>
+                        {
+                            match seq[1] {
+                                b'1' | b'7' => EditorKey::Home,
+                                b'4' | b'8' => EditorKey::End,
+                                b'5' => EditorKey::Page(PageDirection::Up),
+                                b'6' => EditorKey::Page(PageDirection::Down),
+                                _ => unreachable!(),
+                            }
                         }
+                        _ => EditorKey::Char('\x1b'),
                     }
-                    _ => EditorKey::Char('\x1b'),
                 }
-            } else {
-                EditorKey::Char('\x1b')
+                b'O' => match seq[1] {
+                    b'H' => EditorKey::Home,
+                    b'F' => EditorKey::End,
+                    _ => EditorKey::Char('\x1b'),
+                },
+                _ => EditorKey::Char('\x1b'),
             }
         } else {
             EditorKey::Char('\x1b')
