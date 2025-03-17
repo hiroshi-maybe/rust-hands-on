@@ -1,4 +1,5 @@
-use std::io::Read;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Read};
 
 use hecto::stdio::BufferedCommands;
 use hecto::termios::enable_raw_mode;
@@ -7,7 +8,12 @@ use hecto::window::get_window_size;
 fn main() {
     enable_raw_mode().expect("failed to enable raw mode");
     let mut config = EditorConfig::new().expect("failed to initialize editor config");
-    editor_open(&mut config);
+
+    let args = std::env::args();
+    if args.len() > 1 {
+        let file_name = args.skip(1).next().expect("failed to get file name");
+        editor_open(file_name.as_str(), &mut config).expect("failed to open file");
+    }
 
     loop {
         refresh_screen(&config).expect("failed to refresh screen");
@@ -24,8 +30,8 @@ struct EditorRow {
 }
 
 impl EditorRow {
-    fn new() -> Self {
-        Self { chars: Vec::new() }
+    fn new(chars: Vec<char>) -> Self {
+        Self { chars }
     }
 }
 
@@ -158,7 +164,7 @@ fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
 fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
     for y in 0..config.screen_rows {
         if y >= config.rows.len() {
-            if y == config.screen_rows / 3 {
+            if config.rows.len() == 0 && y == config.screen_rows / 3 {
                 draw_welcome_greeting(config, commands);
             } else {
                 let placeholder_tilde_line = b"~";
@@ -196,11 +202,16 @@ fn draw_welcome_greeting(config: &EditorConfig, commands: &mut BufferedCommands)
 
 // region: file i/o
 
-fn editor_open(config: &mut EditorConfig) {
-    let mut row = EditorRow::new();
-    let line = "Hello, world!";
-    row.chars.extend(line.chars());
-    config.rows.push(row);
+fn editor_open(file_name: &str, config: &mut EditorConfig) -> std::io::Result<()> {
+    let file = File::open(file_name).expect("failed to open file");
+    let reader = BufReader::new(file);
+    for line in reader.lines() {
+        let row = EditorRow::new(line?.chars().collect());
+        config.rows.push(row);
+        break;
+    }
+
+    Ok(())
 }
 
 // endregion: file i/o
