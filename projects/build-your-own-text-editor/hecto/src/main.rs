@@ -67,6 +67,7 @@ struct EditorConfig {
     cx: usize,
     cy: usize,
     row_offset: usize,
+    col_offset: usize,
     rows: Vec<EditorRow>,
     screen_rows: usize,
     screen_cols: usize,
@@ -79,6 +80,7 @@ impl EditorConfig {
             cx: 0,
             cy: 0,
             row_offset: 0,
+            col_offset: 0,
             rows: vec![],
             screen_rows,
             screen_cols,
@@ -91,11 +93,16 @@ impl EditorConfig {
 // region: input
 
 fn move_cursor(config: &mut EditorConfig, dir: ArrowDirection) {
+    let col_limit = config
+        .rows
+        .get(config.cy)
+        .map(|r| r.chars.len())
+        .unwrap_or(0);
     match dir {
         ArrowDirection::Left if config.cx > 0 => {
             config.cx -= 1;
         }
-        ArrowDirection::Right if config.cx < config.screen_cols - 1 => {
+        ArrowDirection::Right if config.cx < col_limit => {
             config.cx += 1;
         }
         ArrowDirection::Down if config.cy < config.rows.len() - 1 => {
@@ -110,7 +117,7 @@ fn move_cursor(config: &mut EditorConfig, dir: ArrowDirection) {
 
 fn process_keypress(config: &mut EditorConfig) -> bool {
     let c = read_key();
-    dbg!(c.clone());
+    // dbg!(c.clone());
     match c {
         EditorKey::Char(c) if c == ctrl_key('q') => {
             return refresh_screen(config).is_ok();
@@ -158,7 +165,7 @@ fn refresh_screen(config: &mut EditorConfig) -> Result<(), std::io::Error> {
     let place_cursor_cmd = format!(
         "\x1b[{};{}H",
         config.cy - config.row_offset + 1,
-        config.cx + 1
+        config.cx - config.col_offset + 1
     );
     commmands.append(place_cursor_cmd.as_bytes());
     let make_cursor_visible_cmd = b"\x1b[?25h";
@@ -173,14 +180,22 @@ fn editor_scroll(config: &mut EditorConfig) {
     if config.cy >= config.row_offset + config.screen_rows {
         config.row_offset = config.cy - config.screen_rows + 1;
     }
+    config.col_offset = config.col_offset.min(config.cx);
+    if config.cx >= config.col_offset + config.screen_cols {
+        config.col_offset = config.cx - config.screen_cols + 1;
+    }
 }
 
 fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
-    dbg!(
-        config.cy,
-        config.row_offset,
-        config.row_offset + config.screen_rows
+    print!(
+        "cx: {}, col_offset: {}, config.screen_cols: {}\r\n",
+        config.cx, config.col_offset, config.screen_cols
     );
+    // dbg!(
+    //     config.cy,
+    //     config.row_offset,
+    //     config.row_offset + config.screen_rows
+    // );
     for y in 0..config.screen_rows {
         let file_row = y + config.row_offset;
         if file_row >= config.rows.len() {
@@ -191,9 +206,25 @@ fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
                 commands.append(placeholder_tilde_line);
             }
         } else {
-            let len = config.rows[file_row].chars.len().min(config.screen_cols);
-            let line = &config.rows[file_row].chars[..len];
-            commands.append(line.iter().collect::<String>().as_bytes());
+            let len = config.rows[file_row]
+                .chars
+                .len()
+                .checked_sub(config.col_offset)
+                .unwrap_or(0);
+            let len = len.min(config.screen_cols);
+            print!(
+                "row: {}, row_len: {}, col_offset: {}, col_offset+len: {}\r\n",
+                file_row,
+                config.rows[file_row].chars.len(),
+                config.col_offset,
+                config.col_offset + len
+            );
+            if config.col_offset < config.rows[file_row].chars.len() {
+                let line = &config.rows[file_row].chars[config.col_offset..config.col_offset + len];
+                commands.append(line.iter().collect::<String>().as_bytes());
+            } else {
+                commands.append(b"");
+            };
         }
 
         let clear_line_cmd = b"\x1b[K";
