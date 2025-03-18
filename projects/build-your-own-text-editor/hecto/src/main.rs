@@ -16,7 +16,7 @@ fn main() {
     }
 
     loop {
-        refresh_screen(&config).expect("failed to refresh screen");
+        refresh_screen(&mut config).expect("failed to refresh screen");
         if process_keypress(&mut config) {
             break;
         }
@@ -66,6 +66,7 @@ enum PageDirection {
 struct EditorConfig {
     cx: usize,
     cy: usize,
+    row_offset: usize,
     rows: Vec<EditorRow>,
     screen_rows: usize,
     screen_cols: usize,
@@ -77,6 +78,7 @@ impl EditorConfig {
         Ok(Self {
             cx: 0,
             cy: 0,
+            row_offset: 0,
             rows: vec![],
             screen_rows,
             screen_cols,
@@ -96,7 +98,7 @@ fn move_cursor(config: &mut EditorConfig, dir: ArrowDirection) {
         ArrowDirection::Right if config.cx < config.screen_cols - 1 => {
             config.cx += 1;
         }
-        ArrowDirection::Down if config.cy < config.screen_rows - 1 => {
+        ArrowDirection::Down if config.cy < config.rows.len() - 1 => {
             config.cy += 1;
         }
         ArrowDirection::Up if config.cy > 0 => {
@@ -139,7 +141,8 @@ fn ctrl_key(c: char) -> char {
 
 // region: output
 
-fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
+fn refresh_screen(config: &mut EditorConfig) -> Result<(), std::io::Error> {
+    editor_scroll(config);
     let make_cursor_invisible_cmd = b"\x1b[?25l";
     let reposition_cursor_cmd = b"\x1b[H";
     let mut commmands = BufferedCommands::new(
@@ -152,7 +155,11 @@ fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
 
     draw_rows(config, &mut commmands);
 
-    let place_cursor_cmd = format!("\x1b[{};{}H", config.cy + 1, config.cx + 1);
+    let place_cursor_cmd = format!(
+        "\x1b[{};{}H",
+        config.cy - config.row_offset + 1,
+        config.cx + 1
+    );
     commmands.append(place_cursor_cmd.as_bytes());
     let make_cursor_visible_cmd = b"\x1b[?25h";
     commmands.append(make_cursor_visible_cmd);
@@ -161,9 +168,22 @@ fn refresh_screen(config: &EditorConfig) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+fn editor_scroll(config: &mut EditorConfig) {
+    config.row_offset = config.row_offset.min(config.cy);
+    if config.cy >= config.row_offset + config.screen_rows {
+        config.row_offset = config.cy - config.screen_rows + 1;
+    }
+}
+
 fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
+    dbg!(
+        config.cy,
+        config.row_offset,
+        config.row_offset + config.screen_rows
+    );
     for y in 0..config.screen_rows {
-        if y >= config.rows.len() {
+        let file_row = y + config.row_offset;
+        if file_row >= config.rows.len() {
             if config.rows.len() == 0 && y == config.screen_rows / 3 {
                 draw_welcome_greeting(config, commands);
             } else {
@@ -171,8 +191,8 @@ fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
                 commands.append(placeholder_tilde_line);
             }
         } else {
-            let len = config.rows[y].chars.len().min(config.screen_cols);
-            let line = &config.rows[y].chars[..len];
+            let len = config.rows[file_row].chars.len().min(config.screen_cols);
+            let line = &config.rows[file_row].chars[..len];
             commands.append(line.iter().collect::<String>().as_bytes());
         }
 
