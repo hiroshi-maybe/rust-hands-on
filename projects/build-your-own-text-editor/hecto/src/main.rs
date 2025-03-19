@@ -148,10 +148,17 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
         }
         EditorKey::Arrow(dir) => move_cursor(config, dir),
         EditorKey::Page(dir) => {
-            let key = match dir {
-                PageDirection::Up => ArrowDirection::Up,
-                PageDirection::Down => ArrowDirection::Down,
+            let (key, adjusted_cy) = match dir {
+                PageDirection::Up => (ArrowDirection::Up, config.row_offset),
+                PageDirection::Down => (
+                    ArrowDirection::Down,
+                    config
+                        .rows
+                        .len()
+                        .min(config.row_offset + config.screen_rows - 1),
+                ),
             };
+            config.cy = adjusted_cy;
             for _ in 0..config.screen_rows {
                 move_cursor(config, key);
             }
