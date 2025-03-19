@@ -105,13 +105,19 @@ fn move_cursor(config: &mut EditorConfig, dir: ArrowDirection) {
         ArrowDirection::Right if config.cx < col_limit => {
             config.cx += 1;
         }
-        ArrowDirection::Down if config.cy < config.rows.len() - 1 => {
+        ArrowDirection::Down if config.cy < config.rows.len() => {
             config.cy += 1;
         }
         ArrowDirection::Up if config.cy > 0 => {
             config.cy -= 1;
         }
         _ => {}
+    }
+
+    config.cx = if let Some(row) = config.rows.get(config.cy) {
+        config.cx.min(row.chars.len())
+    } else {
+        0
     }
 }
 
@@ -187,15 +193,8 @@ fn editor_scroll(config: &mut EditorConfig) {
 }
 
 fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
-    print!(
-        "cx: {}, col_offset: {}, config.screen_cols: {}\r\n",
-        config.cx, config.col_offset, config.screen_cols
-    );
-    // dbg!(
-    //     config.cy,
-    //     config.row_offset,
-    //     config.row_offset + config.screen_rows
-    // );
+    dbg!(config.cx, config.col_offset, config.screen_cols);
+    dbg!(config.cy, config.row_offset, config.screen_rows);
     for y in 0..config.screen_rows {
         let file_row = y + config.row_offset;
         if file_row >= config.rows.len() {
