@@ -72,6 +72,7 @@ enum PageDirection {
 struct EditorConfig {
     cx: usize,
     cy: usize,
+    rx: usize,
     row_offset: usize,
     col_offset: usize,
     rows: Vec<EditorRow>,
@@ -85,6 +86,7 @@ impl EditorConfig {
         Ok(Self {
             cx: 0,
             cy: 0,
+            rx: 0,
             row_offset: 0,
             col_offset: 0,
             rows: vec![],
@@ -187,7 +189,7 @@ fn refresh_screen(config: &mut EditorConfig) -> Result<(), std::io::Error> {
     let place_cursor_cmd = format!(
         "\x1b[{};{}H",
         config.cy - config.row_offset + 1,
-        config.cx - config.col_offset + 1
+        config.rx - config.col_offset + 1
     );
     commmands.append(place_cursor_cmd.as_bytes());
     let make_cursor_visible_cmd = b"\x1b[?25h";
@@ -198,13 +200,18 @@ fn refresh_screen(config: &mut EditorConfig) -> Result<(), std::io::Error> {
 }
 
 fn editor_scroll(config: &mut EditorConfig) {
+    config.rx = config.cx;
+    if config.cy < config.rows.len() {
+        config.rx = map_row_cx_to_rx(&config.rows[config.cy], config.cx);
+    }
+
     config.row_offset = config.row_offset.min(config.cy);
     if config.cy >= config.row_offset + config.screen_rows {
         config.row_offset = config.cy - config.screen_rows + 1;
     }
-    config.col_offset = config.col_offset.min(config.cx);
-    if config.cx >= config.col_offset + config.screen_cols {
-        config.col_offset = config.cx - config.screen_cols + 1;
+    config.col_offset = config.col_offset.min(config.rx);
+    if config.rx >= config.col_offset + config.screen_cols {
+        config.col_offset = config.rx - config.screen_cols + 1;
     }
 }
 
@@ -276,6 +283,19 @@ fn editor_open(file_name: &str, config: &mut EditorConfig) -> std::io::Result<()
 // endregion: file i/o
 
 // region: row operations
+
+fn map_row_cx_to_rx(row: &EditorRow, cx: usize) -> usize {
+    let mut rx = 0;
+    for i in 0..cx {
+        if row.chars[i] == '\t' {
+            rx = rx + TAB_STOP - (rx % TAB_STOP);
+        } else {
+            rx += 1;
+        }
+    }
+
+    rx
+}
 
 fn update_row(row: &mut EditorRow) {
     row.render.clear();
