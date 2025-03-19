@@ -25,13 +25,19 @@ fn main() {
 
 // region: defines
 
+const TAB_STOP: usize = 8;
+
 struct EditorRow {
     chars: Vec<char>,
+    render: Vec<char>,
 }
 
 impl EditorRow {
     fn new(chars: Vec<char>) -> Self {
-        Self { chars }
+        Self {
+            chars,
+            render: vec![],
+        }
     }
 }
 
@@ -99,11 +105,21 @@ fn move_cursor(config: &mut EditorConfig, dir: ArrowDirection) {
         .map(|r| r.chars.len())
         .unwrap_or(0);
     match dir {
-        ArrowDirection::Left if config.cx > 0 => {
-            config.cx -= 1;
+        ArrowDirection::Left => {
+            if config.cx > 0 {
+                config.cx -= 1;
+            } else if config.cy > 0 {
+                config.cy -= 1;
+                config.cx = config.rows[config.cy].chars.len();
+            }
         }
-        ArrowDirection::Right if config.cx < col_limit => {
-            config.cx += 1;
+        ArrowDirection::Right => {
+            if config.cx < col_limit {
+                config.cx += 1;
+            } else if config.cy < config.rows.len() && config.cx == col_limit {
+                config.cy += 1;
+                config.cx = 0;
+            }
         }
         ArrowDirection::Down if config.cy < config.rows.len() => {
             config.cy += 1;
@@ -206,20 +222,14 @@ fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
             }
         } else {
             let len = config.rows[file_row]
-                .chars
+                .render
                 .len()
                 .checked_sub(config.col_offset)
                 .unwrap_or(0);
             let len = len.min(config.screen_cols);
-            print!(
-                "row: {}, row_len: {}, col_offset: {}, col_offset+len: {}\r\n",
-                file_row,
-                config.rows[file_row].chars.len(),
-                config.col_offset,
-                config.col_offset + len
-            );
-            if config.col_offset < config.rows[file_row].chars.len() {
-                let line = &config.rows[file_row].chars[config.col_offset..config.col_offset + len];
+            if config.col_offset < config.rows[file_row].render.len() {
+                let line =
+                    &config.rows[file_row].render[config.col_offset..config.col_offset + len];
                 commands.append(line.iter().collect::<String>().as_bytes());
             } else {
                 commands.append(b"");
@@ -263,12 +273,30 @@ fn editor_open(file_name: &str, config: &mut EditorConfig) -> std::io::Result<()
     Ok(())
 }
 
+// endregion: file i/o
+
+// region: row operations
+
+fn update_row(row: &mut EditorRow) {
+    row.render.clear();
+    for i in 0..row.chars.len() {
+        if row.chars[i] == '\t' {
+            while row.render.len() % TAB_STOP != 0 {
+                row.render.push(' ');
+            }
+        } else {
+            row.render.push(row.chars[i]);
+        }
+    }
+}
+
 fn editor_append_row(line: String, config: &mut EditorConfig) {
-    let row = EditorRow::new(line.trim_end().chars().collect());
+    let mut row = EditorRow::new(line.trim_end().chars().collect());
+    update_row(&mut row);
     config.rows.push(row);
 }
 
-// endregion: file i/o
+// endregion: row operations
 
 // region: terminal
 
