@@ -164,7 +164,13 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
             }
         }
         EditorKey::Home => config.cx = 0,
-        EditorKey::End => config.cx = config.screen_cols - 1,
+        EditorKey::End => {
+            config.cx = if let Some(row) = config.rows.get(config.cy) {
+                row.chars.len()
+            } else {
+                0
+            }
+        }
         _ => {}
     }
 
