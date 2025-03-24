@@ -76,6 +76,7 @@ struct EditorConfig {
     row_offset: usize,
     col_offset: usize,
     rows: Vec<EditorRow>,
+    file_name: Option<String>,
     screen_rows: usize,
     screen_cols: usize,
 }
@@ -90,7 +91,8 @@ impl EditorConfig {
             row_offset: 0,
             col_offset: 0,
             rows: vec![],
-            screen_rows,
+            file_name: None,
+            screen_rows: screen_rows - 1,
             screen_cols,
         })
     }
@@ -198,6 +200,7 @@ fn refresh_screen(config: &mut EditorConfig) -> Result<(), std::io::Error> {
     );
 
     draw_rows(config, &mut commmands);
+    draw_status_bar(config, &mut commmands);
 
     let place_cursor_cmd = format!(
         "\x1b[{};{}H",
@@ -258,9 +261,7 @@ fn draw_rows(config: &EditorConfig, commands: &mut BufferedCommands) {
 
         let clear_line_cmd = b"\x1b[K";
         commands.append(clear_line_cmd);
-        if y < config.screen_rows - 1 {
-            commands.append(b"\r\n");
-        }
+        commands.append(b"\r\n");
     }
 }
 
@@ -278,12 +279,44 @@ fn draw_welcome_greeting(config: &EditorConfig, commands: &mut BufferedCommands)
     commands.append(greeting.bytes().collect::<Vec<_>>().as_slice());
 }
 
+fn draw_status_bar(config: &EditorConfig, commands: &mut BufferedCommands) {
+    let file_name = config.file_name.as_deref().unwrap_or("[No Name]");
+    let lines = config.rows.len();
+    let status_left = format!("{:.20} - {} lines", file_name, lines);
+    let status_right = format!("{}/{}", config.cy + 1, config.rows.len());
+    draw_text_in_status_bar(config, &status_left, &status_right, commands);
+}
+
+fn draw_text_in_status_bar(
+    config: &EditorConfig,
+    text_left: &str,
+    text_right: &str,
+    commands: &mut BufferedCommands,
+) {
+    let inverted_color_cmd = b"\x1b[7m";
+    commands.append(inverted_color_cmd);
+    let mut len = text_left.as_bytes().len().min(config.screen_cols);
+    commands.append(&text_left.as_bytes()[..len]);
+    while len < config.screen_cols {
+        if len + text_right.as_bytes().len() == config.screen_cols {
+            commands.append(text_right.as_bytes());
+            break;
+        }
+        commands.append(&[b' ']);
+        len += 1;
+    }
+
+    let clear_text_attributes_cmd = b"\x1b[m";
+    commands.append(clear_text_attributes_cmd);
+}
+
 // endregion: output
 
 // region: file i/o
 
 fn editor_open(file_name: &str, config: &mut EditorConfig) -> std::io::Result<()> {
     let file = File::open(file_name).expect("failed to open file");
+    config.file_name = Some(file_name.to_string());
     let reader = BufReader::new(file);
     for line in reader.lines() {
         let line = line?;
