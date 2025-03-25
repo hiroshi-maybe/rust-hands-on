@@ -15,6 +15,8 @@ fn main() {
         editor_open(file_name.as_str(), &mut config).expect("failed to open file");
     }
 
+    set_status_message(&mut config, "HELP: Ctrl-Q = quit");
+
     loop {
         refresh_screen(&mut config).expect("failed to refresh screen");
         if process_keypress(&mut config) {
@@ -77,6 +79,8 @@ struct EditorConfig {
     col_offset: usize,
     rows: Vec<EditorRow>,
     file_name: Option<String>,
+    status_msg: Option<String>,
+    status_msg_time: std::time::Instant,
     screen_rows: usize,
     screen_cols: usize,
 }
@@ -92,7 +96,9 @@ impl EditorConfig {
             col_offset: 0,
             rows: vec![],
             file_name: None,
-            screen_rows: screen_rows - 1,
+            status_msg: None,
+            status_msg_time: std::time::Instant::now(),
+            screen_rows: screen_rows - 2,
             screen_cols,
         })
     }
@@ -201,6 +207,7 @@ fn refresh_screen(config: &mut EditorConfig) -> Result<(), std::io::Error> {
 
     draw_rows(config, &mut commmands);
     draw_status_bar(config, &mut commmands);
+    draw_message_bar(config, &mut commmands);
 
     let place_cursor_cmd = format!(
         "\x1b[{};{}H",
@@ -285,6 +292,7 @@ fn draw_status_bar(config: &EditorConfig, commands: &mut BufferedCommands) {
     let status_left = format!("{:.20} - {} lines", file_name, lines);
     let status_right = format!("{}/{}", config.cy + 1, config.rows.len());
     draw_text_in_status_bar(config, &status_left, &status_right, commands);
+    commands.append(b"\r\n");
 }
 
 fn draw_text_in_status_bar(
@@ -308,6 +316,22 @@ fn draw_text_in_status_bar(
 
     let clear_text_attributes_cmd = b"\x1b[m";
     commands.append(clear_text_attributes_cmd);
+}
+
+fn draw_message_bar(config: &EditorConfig, commands: &mut BufferedCommands) {
+    commands.append(b"\x1b[K");
+    let msg = config.status_msg.as_deref().unwrap_or("");
+    let msg_len = msg.len().min(config.screen_cols);
+    let msg = &msg[..msg_len];
+
+    if msg.len() > 0 && config.status_msg_time.elapsed().as_secs() < 5 {
+        commands.append(msg.as_bytes());
+    }
+}
+
+fn set_status_message(config: &mut EditorConfig, msg: &str) {
+    config.status_msg = Some(msg.to_string());
+    config.status_msg_time = std::time::Instant::now();
 }
 
 // endregion: output
