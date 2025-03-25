@@ -1,9 +1,9 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 
-use hecto::stdio::BufferedCommands;
-use hecto::termios::enable_raw_mode;
-use hecto::window::get_window_size;
+use kilo_rs::stdio::BufferedCommands;
+use kilo_rs::termios::enable_raw_mode;
+use kilo_rs::window::get_window_size;
 
 fn main() {
     enable_raw_mode().expect("failed to enable raw mode");
