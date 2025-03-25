@@ -179,7 +179,12 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
                 0
             }
         }
-        _ => {}
+        EditorKey::Char(c) => {
+            editor_insert_char(config, c);
+        }
+        _ => {
+            unreachable!();
+        }
     }
 
     false
@@ -386,7 +391,25 @@ fn editor_append_row(line: String, config: &mut EditorConfig) {
     config.rows.push(row);
 }
 
+fn row_insert_char(row: &mut EditorRow, at: usize, c: char) {
+    let at = at.min(row.chars.len());
+    row.chars.insert(at, c);
+    update_row(row);
+}
+
 // endregion: row operations
+
+// region: editor operations
+
+fn editor_insert_char(config: &mut EditorConfig, c: char) {
+    if config.cy == config.rows.len() {
+        editor_append_row("".to_string(), config);
+    }
+    row_insert_char(&mut config.rows[config.cy], config.cx, c);
+    config.cx += 1;
+}
+
+// endregion: editor operations
 
 // region: terminal
 
