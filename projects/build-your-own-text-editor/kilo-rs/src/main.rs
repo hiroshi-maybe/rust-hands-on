@@ -29,6 +29,13 @@ fn main() {
 
 const TAB_STOP: usize = 8;
 
+const RETURN: char = '\r';
+const CTRL_Q: char = ctrl_key('q');
+const CTRL_L: char = ctrl_key('l');
+const ESCAPE: char = '\x1b';
+const CTRL_H: char = ctrl_key('h');
+const BACKSPACE: char = '\x7f';
+
 struct EditorRow {
     chars: Vec<char>,
     render: Vec<char>,
@@ -45,6 +52,7 @@ impl EditorRow {
 
 #[derive(Debug, Clone, Copy)]
 enum EditorKey {
+    Backspace,
     Arrow(ArrowDirection),
     Page(PageDirection),
     Home,
@@ -151,8 +159,20 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
     let c = read_key();
     // dbg!(c.clone());
     match c {
-        EditorKey::Char(c) if c == ctrl_key('q') => {
-            return refresh_screen(config).is_ok();
+        EditorKey::Char(c) => match c {
+            CTRL_Q => {
+                return refresh_screen(config).is_ok();
+            }
+            RETURN => {
+                // TODO: handle enter
+            }
+            ESCAPE | CTRL_L => {
+                // Ignore escape key
+            }
+            _ => editor_insert_char(config, c),
+        },
+        EditorKey::Backspace | EditorKey::Del => {
+            // TODO: handle del
         }
         EditorKey::Arrow(dir) => move_cursor(config, dir),
         EditorKey::Page(dir) => {
@@ -179,18 +199,12 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
                 0
             }
         }
-        EditorKey::Char(c) => {
-            editor_insert_char(config, c);
-        }
-        _ => {
-            unreachable!();
-        }
     }
 
     false
 }
 
-fn ctrl_key(c: char) -> char {
+const fn ctrl_key(c: char) -> char {
     (c as u8 & 0x1f) as char
 }
 
@@ -422,7 +436,7 @@ fn read_key() -> EditorKey {
     let c = buffer[0] as char;
 
     // Escape sequence
-    if c == '\x1b' {
+    if c == ESCAPE {
         let mut seq = [0; 2];
         if handle.read(&mut seq).is_ok_and(|n| n == 2) {
             match seq[0] {
@@ -447,21 +461,25 @@ fn read_key() -> EditorKey {
                                 _ => unreachable!(),
                             }
                         }
-                        _ => EditorKey::Char('\x1b'),
+                        _ => EditorKey::Char(ESCAPE),
                     }
                 }
                 b'O' => match seq[1] {
                     b'H' => EditorKey::Home,
                     b'F' => EditorKey::End,
-                    _ => EditorKey::Char('\x1b'),
+                    _ => EditorKey::Char(ESCAPE),
                 },
-                _ => EditorKey::Char('\x1b'),
+                _ => EditorKey::Char(ESCAPE),
             }
         } else {
-            EditorKey::Char('\x1b')
+            EditorKey::Char(ESCAPE)
         }
     } else {
-        EditorKey::Char(c)
+        if c == CTRL_H || c == BACKSPACE {
+            EditorKey::Backspace
+        } else {
+            EditorKey::Char(c)
+        }
     }
 }
 
