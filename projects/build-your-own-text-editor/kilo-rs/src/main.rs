@@ -29,6 +29,7 @@ fn main() {
 // region: defines
 
 const TAB_STOP: usize = 8;
+const KILO_QUIT_TIMES: usize = 3;
 
 const CR: char = '\r';
 const LF: char = '\n';
@@ -90,6 +91,7 @@ struct EditorConfig {
     col_offset: usize,
     rows: Vec<EditorRow>,
     dirty: bool,
+    quit_times: usize,
     file_name: Option<String>,
     status_msg: Option<String>,
     status_msg_time: std::time::Instant,
@@ -108,6 +110,7 @@ impl EditorConfig {
             col_offset: 0,
             rows: vec![],
             dirty: false,
+            quit_times: KILO_QUIT_TIMES,
             file_name: None,
             status_msg: None,
             status_msg_time: std::time::Instant::now(),
@@ -166,6 +169,15 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
     match c {
         EditorKey::Char(c) => match c {
             CTRL_Q => {
+                if config.dirty && config.quit_times > 0 {
+                    set_status_message(
+                        config,
+                        format!("WARNING!!! File has unsaved changes. Press Ctrl-Q {} more times to quit.", config.quit_times)
+                            .as_str(),
+                    );
+                    config.quit_times -= 1;
+                    return false;
+                }
                 return refresh_screen(config).is_ok();
             }
             CTRL_S => {
@@ -210,6 +222,8 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
             }
         }
     }
+
+    config.quit_times = KILO_QUIT_TIMES;
 
     false
 }
