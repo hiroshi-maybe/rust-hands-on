@@ -89,6 +89,7 @@ struct EditorConfig {
     row_offset: usize,
     col_offset: usize,
     rows: Vec<EditorRow>,
+    dirty: bool,
     file_name: Option<String>,
     status_msg: Option<String>,
     status_msg_time: std::time::Instant,
@@ -106,6 +107,7 @@ impl EditorConfig {
             row_offset: 0,
             col_offset: 0,
             rows: vec![],
+            dirty: false,
             file_name: None,
             status_msg: None,
             status_msg_time: std::time::Instant::now(),
@@ -316,7 +318,12 @@ fn draw_welcome_greeting(config: &EditorConfig, commands: &mut BufferedCommands)
 fn draw_status_bar(config: &EditorConfig, commands: &mut BufferedCommands) {
     let file_name = config.file_name.as_deref().unwrap_or("[No Name]");
     let lines = config.rows.len();
-    let status_left = format!("{:.20} - {} lines", file_name, lines);
+    let status_left = format!(
+        "{:.20} - {} lines {}",
+        file_name,
+        lines,
+        if config.dirty { "(modified)" } else { "" }
+    );
     let status_right = format!("{}/{}", config.cy + 1, config.rows.len());
     draw_text_in_status_bar(config, &status_left, &status_right, commands);
     commands.append(b"\r\n");
@@ -373,6 +380,7 @@ fn editor_open(file_name: &str, config: &mut EditorConfig) -> std::io::Result<()
         let line = line?;
         editor_append_row(line, config);
     }
+    config.dirty = false;
 
     Ok(())
 }
@@ -392,6 +400,7 @@ fn editor_save(config: &mut EditorConfig) -> std::io::Result<()> {
     truncate_file(&mut file, content.len())?;
     let dat = content.as_bytes();
     file.write_all(dat)?;
+    config.dirty = false;
     set_status_message(
         config,
         format!("{} bytes written to disk", dat.len()).as_str(),
@@ -444,12 +453,14 @@ fn editor_append_row(line: String, config: &mut EditorConfig) {
     let mut row = EditorRow::new(line.trim_end().chars().collect());
     update_row(&mut row);
     config.rows.push(row);
+    config.dirty = true;
 }
 
-fn row_insert_char(row: &mut EditorRow, at: usize, c: char) {
+fn row_insert_char(row: &mut EditorRow, at: usize, c: char, dirty: &mut bool) {
     let at = at.min(row.chars.len());
     row.chars.insert(at, c);
     update_row(row);
+    *dirty = true;
 }
 
 // endregion: row operations
@@ -460,7 +471,7 @@ fn editor_insert_char(config: &mut EditorConfig, c: char) {
     if config.cy == config.rows.len() {
         editor_append_row("".to_string(), config);
     }
-    row_insert_char(&mut config.rows[config.cy], config.cx, c);
+    row_insert_char(&mut config.rows[config.cy], config.cx, c, &mut config.dirty);
     config.cx += 1;
 }
 
