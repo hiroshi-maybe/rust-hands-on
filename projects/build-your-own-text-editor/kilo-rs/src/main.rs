@@ -54,7 +54,7 @@ impl EditorRow {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum EditorKey {
     Backspace,
     Arrow(ArrowDirection),
@@ -65,7 +65,7 @@ enum EditorKey {
     Char(char),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum ArrowDirection {
     Left,
     Right,
@@ -73,7 +73,7 @@ enum ArrowDirection {
     Down,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum PageDirection {
     Up,
     Down,
@@ -194,7 +194,10 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
             _ => editor_insert_char(config, c),
         },
         EditorKey::Backspace | EditorKey::Del => {
-            // TODO: handle del
+            if c == EditorKey::Del {
+                move_cursor(config, ArrowDirection::Right);
+            }
+            editor_del_char(config);
         }
         EditorKey::Arrow(dir) => move_cursor(config, dir),
         EditorKey::Page(dir) => {
@@ -477,6 +480,16 @@ fn row_insert_char(row: &mut EditorRow, at: usize, c: char, dirty: &mut bool) {
     *dirty = true;
 }
 
+fn row_del_char(row: &mut EditorRow, at: usize, dirty: &mut bool) {
+    if at >= row.chars.len() {
+        return;
+    }
+
+    row.chars.remove(at);
+    update_row(row);
+    *dirty = true;
+}
+
 // endregion: row operations
 
 // region: editor operations
@@ -487,6 +500,18 @@ fn editor_insert_char(config: &mut EditorConfig, c: char) {
     }
     row_insert_char(&mut config.rows[config.cy], config.cx, c, &mut config.dirty);
     config.cx += 1;
+}
+
+fn editor_del_char(config: &mut EditorConfig) {
+    if config.cy == config.rows.len() {
+        return;
+    }
+
+    let row = &mut config.rows[config.cy];
+    if config.cx > 0 {
+        row_del_char(row, config.cx - 1, &mut config.dirty);
+        config.cx -= 1;
+    }
 }
 
 // endregion: editor operations
