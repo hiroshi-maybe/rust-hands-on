@@ -1,6 +1,7 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::fs::{File, OpenOptions};
+use std::io::{BufRead, BufReader, Read, Write};
 
+use kilo_rs::file::truncate_file;
 use kilo_rs::stdio::BufferedCommands;
 use kilo_rs::termios::enable_raw_mode;
 use kilo_rs::window::get_window_size;
@@ -15,7 +16,7 @@ fn main() {
         editor_open(file_name.as_str(), &mut config).expect("failed to open file");
     }
 
-    set_status_message(&mut config, "HELP: Ctrl-Q = quit");
+    set_status_message(&mut config, "HELP: Ctrl-S = save | Ctrl-Q = quit");
 
     loop {
         refresh_screen(&mut config).expect("failed to refresh screen");
@@ -29,8 +30,10 @@ fn main() {
 
 const TAB_STOP: usize = 8;
 
-const RETURN: char = '\r';
+const CR: char = '\r';
+const LF: char = '\n';
 const CTRL_Q: char = ctrl_key('q');
+const CTRL_S: char = ctrl_key('s');
 const CTRL_L: char = ctrl_key('l');
 const ESCAPE: char = '\x1b';
 const CTRL_H: char = ctrl_key('h');
@@ -163,7 +166,12 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
             CTRL_Q => {
                 return refresh_screen(config).is_ok();
             }
-            RETURN => {
+            CTRL_S => {
+                _ = editor_save(config).inspect_err(|e| {
+                    set_status_message(config, format!("Can't save! I/O error: {}", e).as_str());
+                });
+            }
+            CR => {
                 // TODO: handle enter
             }
             ESCAPE | CTRL_L => {
@@ -367,6 +375,39 @@ fn editor_open(file_name: &str, config: &mut EditorConfig) -> std::io::Result<()
     }
 
     Ok(())
+}
+
+fn editor_save(config: &mut EditorConfig) -> std::io::Result<()> {
+    let Some(file_name) = config.file_name.clone() else {
+        return Ok(());
+    };
+
+    let content = editor_rows_to_string(config);
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(file_name)?;
+
+    truncate_file(&mut file, content.len())?;
+    let dat = content.as_bytes();
+    file.write_all(dat)?;
+    set_status_message(
+        config,
+        format!("{} bytes written to disk", dat.len()).as_str(),
+    );
+
+    Ok(())
+}
+
+fn editor_rows_to_string(config: &EditorConfig) -> String {
+    let mut content = String::new();
+    for row in &config.rows {
+        content.push_str(&row.chars.iter().collect::<String>());
+        content.push(LF);
+    }
+
+    content
 }
 
 // endregion: file i/o
