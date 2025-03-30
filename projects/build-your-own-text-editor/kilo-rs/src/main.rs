@@ -473,9 +473,27 @@ fn editor_append_row(line: String, config: &mut EditorConfig) {
     config.dirty = true;
 }
 
+fn editor_del_row(config: &mut EditorConfig, at: usize) -> Option<EditorRow> {
+    if at >= config.rows.len() {
+        return None;
+    }
+
+    let row = config.rows.remove(at);
+
+    config.dirty = true;
+
+    Some(row)
+}
+
 fn row_insert_char(row: &mut EditorRow, at: usize, c: char, dirty: &mut bool) {
     let at = at.min(row.chars.len());
     row.chars.insert(at, c);
+    update_row(row);
+    *dirty = true;
+}
+
+fn editor_row_append_string(row: &mut EditorRow, s: &mut Vec<char>, dirty: &mut bool) {
+    row.chars.append(s);
     update_row(row);
     *dirty = true;
 }
@@ -506,11 +524,26 @@ fn editor_del_char(config: &mut EditorConfig) {
     if config.cy == config.rows.len() {
         return;
     }
+    if config.cx == 0 && config.cy == 0 {
+        return;
+    }
 
-    let row = &mut config.rows[config.cy];
     if config.cx > 0 {
+        let row = &mut config.rows[config.cy];
         row_del_char(row, config.cx - 1, &mut config.dirty);
         config.cx -= 1;
+    } else {
+        config.cx = config.rows[config.cy - 1].chars.len();
+        let Some(mut row) = editor_del_row(config, config.cy) else {
+            return;
+        };
+
+        editor_row_append_string(
+            &mut config.rows[config.cy - 1],
+            &mut row.chars,
+            &mut config.dirty,
+        );
+        config.cy -= 1;
     }
 }
 
