@@ -186,7 +186,7 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
                 });
             }
             CR => {
-                // TODO: handle enter
+                editor_insert_new_line(config);
             }
             ESCAPE | CTRL_L => {
                 // Ignore escape key
@@ -395,7 +395,7 @@ fn editor_open(file_name: &str, config: &mut EditorConfig) -> std::io::Result<()
     let reader = BufReader::new(file);
     for line in reader.lines() {
         let line = line?;
-        editor_append_row(line, config);
+        editor_insert_row(config.rows.len(), line, config);
     }
     config.dirty = false;
 
@@ -466,10 +466,14 @@ fn update_row(row: &mut EditorRow) {
     }
 }
 
-fn editor_append_row(line: String, config: &mut EditorConfig) {
+fn editor_insert_row(at: usize, line: String, config: &mut EditorConfig) {
+    if at > config.rows.len() {
+        return;
+    }
+
     let mut row = EditorRow::new(line.trim_end().chars().collect());
     update_row(&mut row);
-    config.rows.push(row);
+    config.rows.insert(at, row);
     config.dirty = true;
 }
 
@@ -514,10 +518,23 @@ fn row_del_char(row: &mut EditorRow, at: usize, dirty: &mut bool) {
 
 fn editor_insert_char(config: &mut EditorConfig, c: char) {
     if config.cy == config.rows.len() {
-        editor_append_row("".to_string(), config);
+        editor_insert_row(config.rows.len(), "".to_string(), config);
     }
     row_insert_char(&mut config.rows[config.cy], config.cx, c, &mut config.dirty);
     config.cx += 1;
+}
+
+fn editor_insert_new_line(config: &mut EditorConfig) {
+    if config.cx == 0 {
+        editor_insert_row(config.cy, "".to_string(), config);
+    } else {
+        let row = &mut config.rows[config.cy];
+        let new_row = row.chars.split_off(config.cx);
+        update_row(row);
+        editor_insert_row(config.cy + 1, new_row.iter().collect(), config);
+    }
+    config.cy += 1;
+    config.cx = 0;
 }
 
 fn editor_del_char(config: &mut EditorConfig) {
