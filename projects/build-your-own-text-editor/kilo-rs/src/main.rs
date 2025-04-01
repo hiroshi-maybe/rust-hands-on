@@ -16,7 +16,10 @@ fn main() {
         editor_open(file_name.as_str(), &mut config).expect("failed to open file");
     }
 
-    set_status_message(&mut config, "HELP: Ctrl-S = save | Ctrl-Q = quit");
+    set_status_message(
+        &mut config,
+        "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find",
+    );
 
     loop {
         refresh_screen(&mut config).expect("failed to refresh screen");
@@ -33,6 +36,7 @@ const KILO_QUIT_TIMES: usize = 3;
 
 const CR: char = '\r';
 const LF: char = '\n';
+const CTRL_F: char = ctrl_key('f');
 const CTRL_Q: char = ctrl_key('q');
 const CTRL_S: char = ctrl_key('s');
 const CTRL_L: char = ctrl_key('l');
@@ -184,6 +188,9 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
                 _ = editor_save(config).inspect_err(|e| {
                     set_status_message(config, format!("Can't save! I/O error: {}", e).as_str());
                 });
+            }
+            CTRL_F => {
+                editor_find(config);
             }
             CR => {
                 editor_insert_new_line(config);
@@ -481,6 +488,36 @@ fn editor_rows_to_string(config: &EditorConfig) -> String {
 }
 
 // endregion: file i/o
+
+// region: find
+
+fn editor_find(config: &mut EditorConfig) {
+    let Some(query) = editor_prompt(|query| format!("Search: {} (ESC to cancel)", query), config)
+    else {
+        return;
+    };
+    let query = query.chars().collect::<Vec<_>>();
+    let Some((i, j)) = config.rows.iter().enumerate().find_map(|(i, row)| {
+        row.chars
+            .windows(query.len())
+            .enumerate()
+            .find_map(|(j, window)| {
+                if window == query.as_slice() {
+                    Some((i, j))
+                } else {
+                    None
+                }
+            })
+    }) else {
+        return;
+    };
+
+    config.cy = i;
+    config.cx = j;
+    config.row_offset = config.rows.len();
+}
+
+// endregion: find
 
 // region: row operations
 
