@@ -231,6 +231,45 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
     false
 }
 
+fn editor_prompt<F>(formatter: F, config: &mut EditorConfig) -> Option<String>
+where
+    F: Fn(&str) -> String,
+{
+    let mut buf = vec![];
+    loop {
+        set_status_message(
+            config,
+            formatter(buf.iter().collect::<String>().as_str()).as_str(),
+        );
+        refresh_screen(config).ok()?;
+        let c = read_key();
+        match c {
+            EditorKey::Backspace => {
+                buf.pop();
+            }
+            EditorKey::Char(c) => match c {
+                ESCAPE => {
+                    set_status_message(config, "");
+                    return None;
+                }
+                CR if !buf.is_empty() => {
+                    set_status_message(config, "");
+                    break;
+                }
+                c if !c.is_ascii_control() && (c as u8) < 128 => {
+                    buf.push(c);
+                }
+                _ => {}
+            },
+            _ => {
+                continue;
+            }
+        }
+    }
+
+    Some(buf.iter().collect())
+}
+
 const fn ctrl_key(c: char) -> char {
     (c as u8 & 0x1f) as char
 }
@@ -403,7 +442,12 @@ fn editor_open(file_name: &str, config: &mut EditorConfig) -> std::io::Result<()
 }
 
 fn editor_save(config: &mut EditorConfig) -> std::io::Result<()> {
-    let Some(file_name) = config.file_name.clone() else {
+    let Some(file_name) = config
+        .file_name
+        .clone()
+        .or_else(|| editor_prompt(|file_name| format!("Save as: {}", file_name), config))
+    else {
+        set_status_message(config, "Save aborted");
         return Ok(());
     };
 
