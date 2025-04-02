@@ -524,11 +524,23 @@ fn editor_find_callback(query: &str, key: EditorKey, config: &mut EditorConfig) 
 }
 
 fn editor_find(config: &mut EditorConfig) {
-    editor_prompt(
+    let original_cx = config.cx;
+    let original_cy = config.cy;
+    let original_col_offset = config.col_offset;
+    let original_row_offset = config.row_offset;
+
+    if editor_prompt(
         |query| format!("Search: {} (ESC to cancel)", query),
         |query, key, config| editor_find_callback(query, key, config),
         config,
-    );
+    )
+    .is_none()
+    {
+        config.cx = original_cx;
+        config.cy = original_cy;
+        config.col_offset = original_col_offset;
+        config.row_offset = original_row_offset;
+    }
 }
 
 // endregion: find
