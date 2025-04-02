@@ -238,9 +238,10 @@ fn process_keypress(config: &mut EditorConfig) -> bool {
     false
 }
 
-fn editor_prompt<F>(formatter: F, config: &mut EditorConfig) -> Option<String>
+fn editor_prompt<F, C>(formatter: F, callback: C, config: &mut EditorConfig) -> Option<String>
 where
     F: Fn(&str) -> String,
+    C: Fn(&str, EditorKey, &mut EditorConfig),
 {
     let mut buf = vec![];
     loop {
@@ -249,18 +250,20 @@ where
             formatter(buf.iter().collect::<String>().as_str()).as_str(),
         );
         refresh_screen(config).ok()?;
-        let c = read_key();
-        match c {
+        let key = read_key();
+        match key {
             EditorKey::Backspace => {
                 buf.pop();
             }
             EditorKey::Char(c) => match c {
                 ESCAPE => {
                     set_status_message(config, "");
+                    callback(buf.iter().collect::<String>().as_str(), key, config);
                     return None;
                 }
                 CR if !buf.is_empty() => {
                     set_status_message(config, "");
+                    callback(buf.iter().collect::<String>().as_str(), key, config);
                     break;
                 }
                 c if !c.is_ascii_control() && (c as u8) < 128 => {
@@ -272,6 +275,7 @@ where
                 continue;
             }
         }
+        callback(buf.iter().collect::<String>().as_str(), key, config);
     }
 
     Some(buf.iter().collect())
@@ -449,11 +453,13 @@ fn editor_open(file_name: &str, config: &mut EditorConfig) -> std::io::Result<()
 }
 
 fn editor_save(config: &mut EditorConfig) -> std::io::Result<()> {
-    let Some(file_name) = config
-        .file_name
-        .clone()
-        .or_else(|| editor_prompt(|file_name| format!("Save as: {}", file_name), config))
-    else {
+    let Some(file_name) = config.file_name.clone().or_else(|| {
+        editor_prompt(
+            |file_name| format!("Save as: {}", file_name),
+            |_, _, _| (),
+            config,
+        )
+    }) else {
         set_status_message(config, "Save aborted");
         return Ok(());
     };
@@ -491,11 +497,11 @@ fn editor_rows_to_string(config: &EditorConfig) -> String {
 
 // region: find
 
-fn editor_find(config: &mut EditorConfig) {
-    let Some(query) = editor_prompt(|query| format!("Search: {} (ESC to cancel)", query), config)
-    else {
+fn editor_find_callback(query: &str, key: EditorKey, config: &mut EditorConfig) {
+    if key == EditorKey::Char(ESCAPE) || key == EditorKey::Char(CR) || query.is_empty() {
         return;
-    };
+    }
+
     let query = query.chars().collect::<Vec<_>>();
     let Some((i, j)) = config.rows.iter().enumerate().find_map(|(i, row)| {
         row.chars
@@ -515,6 +521,14 @@ fn editor_find(config: &mut EditorConfig) {
     config.cy = i;
     config.cx = j;
     config.row_offset = config.rows.len();
+}
+
+fn editor_find(config: &mut EditorConfig) {
+    editor_prompt(
+        |query| format!("Search: {} (ESC to cancel)", query),
+        |query, key, config| editor_find_callback(query, key, config),
+        config,
+    );
 }
 
 // endregion: find
