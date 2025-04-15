@@ -101,6 +101,8 @@ struct EditorConfig {
     status_msg_time: std::time::Instant,
     screen_rows: usize,
     screen_cols: usize,
+    last_match: Option<usize>,
+    match_direction: bool,
 }
 
 impl EditorConfig {
@@ -120,6 +122,8 @@ impl EditorConfig {
             status_msg_time: std::time::Instant::now(),
             screen_rows: screen_rows - 2,
             screen_cols,
+            last_match: None,
+            match_direction: true,
         })
     }
 }
@@ -271,9 +275,7 @@ where
                 }
                 _ => {}
             },
-            _ => {
-                continue;
-            }
+            _ => {}
         }
         callback(buf.iter().collect::<String>().as_str(), key, config);
     }
@@ -498,29 +500,61 @@ fn editor_rows_to_string(config: &EditorConfig) -> String {
 // region: find
 
 fn editor_find_callback(query: &str, key: EditorKey, config: &mut EditorConfig) {
-    if key == EditorKey::Char(ESCAPE) || key == EditorKey::Char(CR) || query.is_empty() {
+    if key == EditorKey::Char(ESCAPE) || key == EditorKey::Char(CR) {
+        config.last_match = None;
+        config.match_direction = true;
         return;
     }
 
+    match key {
+        EditorKey::Arrow(ArrowDirection::Down) | EditorKey::Arrow(ArrowDirection::Right) => {
+            config.match_direction = true;
+        }
+        EditorKey::Arrow(ArrowDirection::Up) | EditorKey::Arrow(ArrowDirection::Left) => {
+            config.match_direction = false;
+        }
+        _ => {
+            config.last_match = None;
+            config.match_direction = true;
+        }
+    }
+
+    if config.last_match.is_none() {
+        config.match_direction = true;
+    }
+
+    let delta = if config.match_direction { 1isize } else { -1 };
+    let cur = mod_add(
+        config.last_match.unwrap_or(config.rows.len() - 1),
+        delta,
+        config.rows.len(),
+    );
     let query = query.chars().collect::<Vec<_>>();
-    let Some((i, j)) = config.rows.iter().enumerate().find_map(|(i, row)| {
-        row.chars
+    let Some((i, j)) = (0..config.rows.len()).find_map(|offset| {
+        let i = mod_add(cur, offset as isize * delta, config.rows.len());
+        let row = &config.rows[i];
+        if let Some(j) = row
+            .chars
             .windows(query.len())
-            .enumerate()
-            .find_map(|(j, window)| {
-                if window == query.as_slice() {
-                    Some((i, j))
-                } else {
-                    None
-                }
-            })
+            .position(|w| w == query.as_slice())
+        {
+            Some((i, j))
+        } else {
+            None
+        }
     }) else {
         return;
     };
 
+    // matched
+    config.last_match = Some(i);
     config.cy = i;
     config.cx = j;
     config.row_offset = config.rows.len();
+}
+
+fn mod_add(a: usize, b: isize, modulus: usize) -> usize {
+    (a as isize + modulus as isize + b) as usize % modulus
 }
 
 fn editor_find(config: &mut EditorConfig) {
@@ -530,7 +564,7 @@ fn editor_find(config: &mut EditorConfig) {
     let original_row_offset = config.row_offset;
 
     if editor_prompt(
-        |query| format!("Search: {} (ESC to cancel)", query),
+        |query| format!("Search: {} (Use ESC/Arrows/Enter)", query),
         |query, key, config| editor_find_callback(query, key, config),
         config,
     )
